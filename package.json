@@ -1,0 +1,25 @@
+{
+  "name": "cloud-hop-aeroplane-chess",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test tests/*.test.js",
+    "test:browser": "node scripts/browser-check.mjs",
+    "start": "node server/index.js",
+    "test:online": "node scripts/online-check.mjs"
+  },
+  "dependencies": {
+    "phaser": "3.90.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "vite": "8.3.0"
+  }
+}

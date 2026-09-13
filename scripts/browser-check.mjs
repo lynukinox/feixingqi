@@ -1,0 +1,38 @@
+import { chromium } from '@playwright/test';
+import fs from 'node:fs/promises';
+import assert from 'node:assert/strict';
+
+await fs.mkdir('artifacts',{recursive:true});
+const browser=await chromium.launch({channel:'msedge',headless:true});
+const page=await browser.newPage({viewport:{width:1440,height:1200},deviceScaleFactor:1});
+const errors=[];page.on('pageerror',e=>errors.push(e.message));
+page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+await page.addInitScript(()=>{
+  window.__diceValues=[5,0,1,2,3,4];
+  const original=crypto.getRandomValues.bind(crypto);
+  crypto.getRandomValues=array=>{if(array instanceof Uint32Array&&array.length===1){array[0]=window.__diceValues.shift()??0;return array;}return original(array);};
+});
+await page.goto('http://127.0.0.1:5173',{waitUntil:'networkidle'});
+await page.locator('#board canvas').waitFor();await page.waitForTimeout(1000);
+await page.screenshot({path:'artifacts/desktop.png',fullPage:true});
+await page.locator('#roll').click();await page.locator('[data-piece="0"]').waitFor();
+assert.equal(await page.locator('#dice').getAttribute('aria-label'),'骰子：6 点');
+await page.locator('[data-piece="0"]').click();await page.waitForFunction(()=>document.querySelector('#roll').disabled===false);
+assert.match(await page.locator('#log').innerText(),/起飞/);
+await page.screenshot({path:'artifacts/launched.png',fullPage:true});
+await page.locator('#rules').click();assert.equal(await page.locator('#rules-dialog').evaluate(d=>d.open),true);await page.locator('#rules-dialog .close').click();
+await page.locator('#new-game').click();await page.locator('input[value="local"]').check();await page.locator('#count').selectOption('2');await page.locator('#setup-form button[type="submit"]').click();
+assert.equal(await page.locator('.player-row').count(),2);assert.match(await page.locator('#mode-label').innerText(),/朋友同屏/);
+await page.locator('#roll').click();await page.waitForFunction(()=>document.querySelector('#active-name').textContent.includes('玩家 2'));
+await page.setViewportSize({width:390,height:844});await page.waitForTimeout(500);
+assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+await page.screenshot({path:'artifacts/mobile.png',fullPage:true});
+await page.locator('#new-game').click();await page.locator('input[value="ai"]').check();await page.locator('#count').selectOption('3');await page.locator('#setup-form button[type="submit"]').click();
+await page.evaluate(()=>{window.__diceValues=[0,5,1,0];});
+await page.locator('#roll').click();
+await page.waitForFunction(()=>document.querySelector('#log').textContent.includes('电脑 1的 1 号飞机起飞啦'),{},{timeout:15000});
+await page.waitForFunction(()=>document.querySelector('#active-name').textContent==='轮到你起飞'&&!document.querySelector('#roll').disabled,{},{timeout:15000});
+assert.equal(await page.locator('.player-row').count(),3);
+assert.deepEqual(errors,[]);
+console.log('Browser check passed: rendering, roll 6, launch, extra turn, rules, 2-player local switch, skipped turn, mobile overflow, 3-player AI launch and full turn cycle; no browser errors.');
+await browser.close();

@@ -1,0 +1,10 @@
+Board artwork: adapted from "Fei xing qi board (RYBG).svg" by Mliu92 (2023).
+Source: https://commons.wikimedia.org/wiki/File:Fei_xing_qi_board_(RYBG).svg
+License: Creative Commons Attribution-ShareAlike 4.0 International
+https://creativecommons.org/licenses/by-sa/4.0/
+
+Changes: rotated clockwise by 90 degrees, adjusted colors and background,
+removed printed airplanes for interactive piece rendering, added labels in Phaser.
+The adapted board artwork (board.svg) is distributed under the same CC BY-SA 4.0 license.
+Board coordinate data in src/engine.js is derived from this artwork and is also CC BY-SA 4.0.
+This attribution does not imply endorsement by the original author.
