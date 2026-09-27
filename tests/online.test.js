@@ -80,13 +80,13 @@ test('operation timeout advances a stalled game and resume rearms a fully discon
   const c=await client();await call(c,'join',{code:r.code,token:joined.token});assert.ok(r.deadline>Date.now());
 });
 
-test('leaving host is replaced by a skill-using bot; ownership transfers, revoked token cannot reclaim and last human deletes room',async t=>{
+test('leaving host is replaced by a skill-using bot; ownership transfers, invalid token cannot reclaim and last human deletes room',async t=>{
   const {server,client}=await fixture(t,{rollDie:()=>1,cardRandom:()=>0,botDelayMs:15});const a=await client(),b=await client();
   const created=await call(a,'create',{name:'甲',rules:'skills'});const joined=await call(b,'join',{code:created.room.code,name:'乙'});
   const r=server.rooms.get(created.room.code);await call(a,'start',{revision:r.revision});
   r.state.players[0].hand=['double'];const before=r.state.players[0].pieces.slice();
   await call(a,'leave');assert.equal(r.members[0].bot,true);assert.equal(r.state.players[0].ai,true);assert.deepEqual(before,[-1,-1,-1,-1]);
-  assert.equal((await call(a,'join',{code:r.code,token:created.token})).ok,false);
+  assert.equal((await call(a,'join',{code:r.code,token:'invalid-token'})).ok,false);
   for(let i=0;i<30&&r.state.current===0;i++)await wait(10);
   assert.equal(r.state.current,1);assert.equal(r.state.players[0].stats.cardsUsed,1);assert.ok(r.state.players[0].pieces.some(p=>p>0));
   assert.equal(b.room.host,joined.memberId);assert.ok(b.room.members[0].bot);assert.ok(b.room.state.players[0].hand.every(c=>c===null));
@@ -127,4 +127,17 @@ test('pending rewards are private; only owner may discard, including out of turn
  assert.equal(r.state.current,0);assert.equal(r.state.players[1].hand.at(-1),'shield');
  const rev=r.revision;assert.equal((await call(b,'discard',{revision:rev,index:5})).ok,true);
  assert.equal((await call(b,'discard',{revision:rev,index:0})).ok,false);
+});
+
+
+test('returning owner reclaims bot seat without changing board or allowing tokenless takeover',async t=>{
+ const {server,client}=await fixture(t,{botDelayMs:10000});const a=await client(),b=await client();
+ const made=await call(a,'create',{name:'甲'});await call(b,'join',{code:made.room.code,name:'乙'});
+ const r=server.rooms.get(made.room.code);await call(a,'start',{revision:r.revision});
+ r.state.players[0].pieces[0]=20;await call(a,'leave');
+ assert.equal((await call(a,'join',{code:r.code,name:'甲'})).ok,false);
+ const back=await call(a,'join',{code:r.code,token:made.token});assert.equal(back.ok,true);
+ assert.equal(back.memberId,made.memberId);assert.equal(r.members[0].bot,false);assert.equal(r.state.players[0].ai,false);
+ assert.equal(r.state.players[0].pieces[0],20);assert.ok(r.deadline-Date.now()>50000);
+ assert.equal((await call(a,'roll',{revision:r.revision})).ok,true);
 });

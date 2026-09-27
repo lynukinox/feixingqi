@@ -98,7 +98,13 @@ export function createGameServer({rollDie=()=>randomInt(1,7),turnMs=60000,cardRa
       const r=rooms.get(typeof code==='string'?code.toUpperCase():'');if(!r)throw Error('房间不存在或已过期，请重新创建');
       if(getRoom()&&getRoom()!==r)throw Error('请先离开当前房间');
       const existing=typeof token==='string'?r.members.find(m=>m.token===token):null;
-      if(existing&&!existing.bot)return join(r,existing);
+      if(existing){
+        const wasBot=!!existing.bot;
+        if(wasBot){existing.bot=false;const i=r.members.indexOf(existing);if(r.state)r.state.players[i].ai=false;log(r,`${existing.name}已重连，接回电脑代管的席位`,r.state?.players[i].id);}
+        const result=join(r,existing);
+        if(wasBot&&r.members[r.state.current]?.id===existing.id){arm(r);publish(r);return {...result,room:snapshot(r,existing.id)};}
+        return result;
+      }
       if(getRoom())throw Error('你已在房间中');if(r.state)throw Error('这局已经开始，请等待下一局');if(r.members.length>=4)throw Error('房间已满（最多 4 人）');
       const m=newMember(name);r.members.push(m);return join(r,m);
     });
@@ -137,7 +143,7 @@ export function createGameServer({rollDie=()=>randomInt(1,7),turnMs=60000,cardRa
       const index=r.members.findIndex(m=>m.id===socket.data.member),member=r.members[index];
       socket.leave(r.code);socket.data.room=null;socket.data.member=null;
       if(r.state){
-        member.socketId=null;member.bot=true;member.token=randomBytes(24).toString('hex');
+        member.socketId=null;member.bot=true;
         r.state.players[index].ai=true;
         log(r,`${member.name}已离开，电脑接管其飞机与手牌`,r.state.players[index].id);
         if(r.members.every(m=>m.bot)){clearTimeout(r.timer);rooms.delete(r.code);}
