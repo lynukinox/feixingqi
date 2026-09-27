@@ -1,4 +1,4 @@
-import {chromium} from '@playwright/test';
+import {chromium,expect} from '@playwright/test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {createGameServer} from '../server/index.js';
@@ -21,56 +21,52 @@ try{
   await a.locator('#room-card').waitFor({state:'visible'});const r=[...server.rooms.values()][0];
   await b.goto(url);await b.locator('#online-open').click();await b.locator('#online-name').fill('乙');await b.locator('#room-code').fill(r.code);await b.locator('#room-join').click();
   await a.locator('#room-start').click();await a.locator('.skill-card').first().waitFor();
+  async function finishCard(){
+    const used=r.state.players[0].stats.cardsUsed;
+    await a.locator('#card-dialog button[type="submit"]').click();
+    await expect.poll(()=>r.state.players[0].stats.cardsUsed).toBe(used+1);
+  }
   async function card(index,value){
     await a.locator(`[data-card="${index}"]`).click();if(value!==undefined)await a.locator('#card-target').selectOption(String(value));
-    await a.locator('#card-dialog button[type="submit"]').click();
-    await a.waitForFunction(()=>document.querySelector('.skill-hint').textContent.includes('本次已出牌'));
+    await finishCard();
   }
-  await card(0,5);await a.locator('#roll').click();await a.locator('[data-piece="0"]').click();
-  await a.waitForFunction(()=>!document.querySelector('#roll').disabled);
-  assert.equal(r.state.players[0].pieces[0],0);assert.equal(r.state.current,0);
+  await card(0,2); // First plane takes an extra six-point launch, without consuming the roll.
+  assert.equal(r.state.players[0].pieces[0],0);assert.equal(r.state.phase,'roll');assert.equal(r.state.turn,1);
   assert.equal(await b.locator('.skill-card:not(:disabled)').count(),0);
   async function prepare(kind,setup=()=>{}){
     r.state.current=0;r.state.phase='roll';r.state.die=null;r.state.skillUsed=false;r.state.forcedDie=null;
-    r.state.players[0].hand=[kind];setup();await a.reload();
+    r.state.players.forEach(p=>p.pendingCards=[]);r.state.players[0].hand=[kind];setup();await a.reload();
     await a.locator('.skill-card:not(:disabled)').first().waitFor();
   }
   await prepare('barrier');await a.locator('[data-card="0"]').click();
   await a.locator('#barrier-map [data-option="5"]').click();assert.equal(await a.locator('#card-target').inputValue(),'5');
   await a.screenshot({path:'artifacts/skills-barrier-mobile.png',fullPage:true});
-  await a.locator('#card-dialog button[type="submit"]').click();await a.waitForFunction(()=>document.querySelector('.skill-hint').textContent.includes('本次已出牌'));
+  await finishCard();
   assert.equal(r.state.barriers.length,1);
   await prepare('shield');await a.locator('[data-card="0"]').click();await a.locator('#pick-on-board').click();
   await a.locator('#board-targets button').first().click();await a.locator('#card-dialog button[type="submit"]').click();
-  await a.waitForFunction(()=>document.querySelector('.skill-hint').textContent.includes('本次已出牌'));assert.equal(r.state.players[0].shields[0],true);
-  await prepare('missile',()=>{r.state.players[0].pieces[0]=1;r.state.players[0].pieces[1]=20;r.state.players[1].pieces[0]=27;});
+  await expect.poll(()=>r.state.players[0].shields[0]).toBe(true);assert.equal(r.state.players[0].shields[0],true);
+  await prepare('missile',()=>{r.state.players[0].pieces=[1,2,20,-1];r.state.players[0].shields=[false,false,false,false];r.state.players[1].pieces=[27,28,31,51];});
   await a.locator('[data-card="0"]').click();
-  assert.equal(await a.locator('#card-dialog button[type="submit"]').isDisabled(),true);
+  assert.match(await a.locator('#card-target').innerText(),/友机/);
   await a.locator('#pick-on-board').click();
-  await a.getByRole('button',{name:'选择自己的2号发射飞机',exact:true}).click();
-  assert.match(await a.locator('#target-hint').innerText(),/没有敌机/);
   await a.getByRole('button',{name:'选择自己的1号发射飞机',exact:true}).click();
-  assert.equal(await a.locator('.range-cell').count(),11);
   await a.screenshot({path:'artifacts/missile-targeting-mobile.png',fullPage:true});
-  await a.getByRole('button',{name:'攻击乙 1号飞机',exact:true}).click();
-  assert.match(await a.locator('#card-target').innerText(),/乙/);
-  await a.locator('#card-dialog button[type="submit"]').click();
-  await a.waitForFunction(()=>document.querySelector('.skill-hint').textContent.includes('本次已出牌'));
-  assert.equal(r.state.players[1].pieces[0],-1);
+  await a.getByRole('button',{name:'确认范围攻击',exact:true}).click();await finishCard();
+  assert.deepEqual(r.state.players[0].pieces,[1,-1,20,-1]);assert.deepEqual(r.state.players[1].pieces,[-1,-1,31,51]);
   await prepare('disrupt',()=>{r.state.players[1].hand=['dice','shield'];});await card(0);assert.equal(r.state.players[1].hand.length,1);
   await prepare('steal');await card(0);assert.deepEqual(r.state.players[0].hand,['shield']);assert.equal(r.state.players[1].hand.length,0);
   await prepare('recycle');await card(0);assert.equal(r.state.players[0].pieces[0],-1);assert.equal(r.state.players[0].hand.length,2);
-  await prepare('double',()=>{r.state.players[0].pieces=[-1,-1,-1,-1];});await card(0);assert.deepEqual(r.state.players[0].pieces.slice(0,2),[0,0]);
+  await prepare('double',()=>{r.state.players[0].pieces=[-1,-1,-1,-1];});await card(0);assert.deepEqual(r.state.players[0].pieces,[0,0,0,0]);
   await prepare('dice',()=>{r.state.players[0].hand=['dice','barrier','shield','missile','steal'];r.state.players[1].hand=['recycle'];});
   assert.equal(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await a.screenshot({path:'artifacts/skills-mobile.png',fullPage:true});
   await a.setViewportSize({width:1440,height:1100});await a.screenshot({path:'artifacts/skills-desktop.png',fullPage:true});
   await prepare('dice',()=>{r.state.players[0].pieces=[55,56,56,56];});await card(0,0);
-  await a.locator('#roll').click();await a.locator('[data-piece="0"]').click();
   await a.locator('#win-dialog').waitFor({state:'visible'});
   assert.equal(await a.locator('#match-results tbody tr').count(),2);
   assert.match(await a.locator('#match-results').innerText(),/4\/4/);
   await a.screenshot({path:'artifacts/match-results.png',fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('Skills browser check passed: classic/skills setup, two phones, all eight cards, roadblock map, forced six, reconnect, mobile layout; no page errors.');
+  console.log('Skills browser check passed: classic/skills setup, two phones, all eight cards, roadblock map, extra movement, area missile, all-plane launch, reconnect, mobile layout; no page errors.');
 }finally{await browser.close();await server.close();}

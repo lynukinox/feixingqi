@@ -1,4 +1,4 @@
-import {position,RING,globalIndex,COLORS} from './engine.js';
+import {position,RING,globalIndex,COLORS,missileTargets} from './engine.js';
 
 export function createBoardPicker(){
   const board=document.querySelector('#board'),overlay=document.createElement('div'),hint=document.createElement('div');
@@ -23,21 +23,22 @@ export function createBoardPicker(){
       if(stack.length>1){const i=stack.indexOf(piece);p[0]+=(i%2-.5)*19;p[1]+=(Math.floor(i/2)-.5)*19;}return p;
     }
     const choose=args=>{clear();onPick(args);};
-    function targets(piece){
-      overlay.replaceChildren();const filtered=options.filter(o=>o.args.piece===piece);
-      heading(filtered.length?'选择高亮敌机，确认导弹目标':'五格内没有敌机，请换一架发射飞机');
-      const center=globalIndex(actor,actor.pieces[piece]);
-      for(let d=-5;d<=5;d++){
-        const [x,y]=RING[(center+d+52)%52],dot=document.createElement('i');dot.className='range-cell';dot.style.left=`${x/9.5}%`;dot.style.top=`${y/9.5}%`;overlay.append(dot);
-      }
-      sources(false);
-      for(const o of filtered){const enemy=state.players.find(p=>p.id===o.args.target);marker(point(enemy,o.args.targetPiece),String(o.args.targetPiece+1),COLORS[enemy.id],()=>choose(o.args),`攻击${enemy.name} ${o.args.targetPiece+1}号飞机`);}
+    if(kind==='missile'){
+      heading('选择发射飞机，再确认范围内所有目标（包括友机）');
+      for(const o of options)marker(point(actor,o.args.piece),String(o.args.piece+1),COLORS[actor.id],()=>{
+        overlay.replaceChildren();
+        heading('前后 3 格范围：点击发射飞机确认，红圈内友机也会受伤');
+        const center=globalIndex(actor,actor.pieces[o.args.piece]);
+        for(let d=-3;d<=3;d++){
+          const [x,y]=RING[(center+d+52)%52],dot=document.createElement('i');dot.className='range-cell';dot.style.left=`${x/9.5}%`;dot.style.top=`${y/9.5}%`;overlay.append(dot);
+        }
+        for(const t of missileTargets(state,actor,o.args.piece)){
+          const p=state.players.find(p=>p.id===t.player),[x,y]=point(p,t.piece),dot=document.createElement('i');
+          dot.className='range-cell';dot.style.cssText=`left:${x/9.5}%;top:${y/9.5}%;border:3px solid #d44736;background:#e7473f55`;overlay.append(dot);
+        }
+        marker(point(actor,o.args.piece),'✓',COLORS[actor.id],()=>choose(o.args),'确认范围攻击');
+      },`选择自己的${o.args.piece+1}号发射飞机`);
     }
-    function sources(reset=true){
-      if(reset){overlay.replaceChildren();heading('第一步：点击自己的发射飞机');}
-      actor.pieces.forEach((v,i)=>{if(v>0&&v<=50)marker(point(actor,i),String(i+1),COLORS[actor.id],()=>targets(i),`选择自己的${i+1}号发射飞机`);});
-    }
-    if(kind==='missile')sources();
     else{
       overlay.replaceChildren();heading(kind==='barrier'?'点击高亮空格放置路障':'点击高亮的己方飞机');
       for(const o of options){

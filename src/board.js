@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
+import { planeSvg } from './plane-model.js';
 import { COLORS, FINISH, position, rotatePoint, legalPieces, RING } from './engine.js';
 
 const SIZE=950;
 const xy=([x,y])=>({x,y});
 const color=id=>Phaser.Display.Color.HexStringToColor(COLORS[id]).color;
-const plane='M 0 -18 L 4 -5 L 17 3 L 17 8 L 4 4 L 4 12 L 9 16 L 9 20 L 0 16 L -9 20 L -9 16 L -4 12 L -4 4 L -17 8 L -17 3 L -4 -5 Z';
 
 export class Board extends Phaser.Scene {
   constructor(onPiece) {super('board');this.onPiece=onPiece;this.ready=false;this.tokens=[];this.skillMarkers=[];}
@@ -17,7 +17,7 @@ export class Board extends Phaser.Scene {
     };
     this.textures.on(Phaser.Textures.Events.LOAD,onLoad);
     for(let id=0;id<4;id++) {
-      const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="-24 -24 48 48"><path d="${plane}" fill="white" stroke="${COLORS[id]}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+      const svg=planeSvg(COLORS[id]);
       this.textures.addBase64(`plane-${id}`,`data:image/svg+xml;base64,${btoa(svg)}`);
     }
     this.drawBoard();
@@ -81,15 +81,20 @@ export class Board extends Phaser.Scene {
       if(overlaps.length>1){const n=overlaps.indexOf(i);point.x+=(n%2-.5)*19;point.y+=(Math.floor(n/2)-.5)*19;}
       const active=player.id===current.id&&legal.includes(i)&&!current.ai&&(controllableId===null||player.id===controllableId);
       const c=this.add.container(point.x,point.y),disk=this.add.graphics();
-      disk.fillStyle(0x17291c,.19).fillCircle(0,4,22);
+      disk.fillStyle(0x14273d,.12).fillEllipse(0,6,48,42);
+      disk.fillStyle(0x14273d,.2).fillCircle(0,3,22);
       disk.fillStyle(arrived?0xffffff:color(player.id)).fillCircle(0,0,21);
       disk.lineStyle(active?4:2,arrived?color(player.id):0xffffff).strokeCircle(0,0,21);
+      if(!arrived){
+        disk.fillStyle(0xffffff,.14).fillEllipse(-3,-8,34,18);
+        disk.lineStyle(1,0xffffff,.35).strokeCircle(0,-1,18);
+      }
       if(active)disk.lineStyle(3,color(player.id),.8).strokeCircle(0,0,28);
       if(player.shields?.[i]&&!arrived)disk.lineStyle(4,0x68daf2).strokeCircle(0,0,32);
       c.add(disk);
       if(arrived)c.add(this.add.text(0,0,'✓',{fontSize:'27px',fontStyle:'bold',color:COLORS[player.id]}).setOrigin(.5));
       else {
-        const icon=this.add.image(0,-1,`plane-${player.id}`).setDisplaySize(42,42).setRotation((player.id+1)*Math.PI/2);
+        const icon=this.add.image(0,-1,`plane-${player.id}`).setDisplaySize(46,46).setRotation((player.id+1)*Math.PI/2);
         const number=this.add.text(16,17,String(i+1),{fontFamily:'Arial',fontSize:'12px',fontStyle:'bold',color:'#ffffff',backgroundColor:COLORS[player.id],padding:{x:3,y:1}}).setOrigin(.5);
         c.add([icon,number]);
       }
@@ -109,11 +114,16 @@ export class Board extends Phaser.Scene {
         this.tweens.add({targets:ring,scale:2.8,alpha:0,duration:700,onComplete:()=>ring.destroy()});
         this.tweens.add({targets:label,y:y-80,alpha:0,duration:1100,onComplete:()=>label.destroy()});
       };
-      if(e.kind==='missile'||e.kind==='recycle'){
+      if(e.kind==='extra-flight'){
+        const [sx,sy]=e.from,ghost=this.add.image(sx,sy,`plane-${e.player}`).setDisplaySize(46,46).setDepth(65).setRotation((e.player+1)*Math.PI/2);
+        const points=[...e.route];
+        const advance=()=>{const p=points.shift();if(!p){ghost.destroy();burst('额外飞行','#368fa9');return;}
+          this.tweens.add({targets:ghost,x:p[0],y:p[1],duration:180,onComplete:advance});};advance();
+      }else if(e.kind==='missile'||e.kind==='recycle'){
         const [sx,sy]=e.from,projectile=this.label(sx,sy,e.kind==='missile'?'➤':'✈',38,e.kind==='missile'?'#dd673d':'#6384a5').setDepth(65);
         projectile.setRotation(Math.atan2(y-sy,x-sx));
         this.tweens.add({targets:projectile,x,y,duration:500,ease:'Sine.easeIn',onComplete:()=>{projectile.destroy();burst(e.kind==='recycle'?'回收 +2':e.blocked?'护盾抵挡':'命中！',e.blocked?'#368fa9':'#d96a38');}});
-      }else burst(({blocked:'护盾破裂',shield:'护盾已展开',barrier:'路障',double:'双机起飞'})[e.kind]||'技能生效',e.kind==='blocked'||e.kind==='shield'?'#368fa9':'#d58a38');
+      }else burst(({blocked:'护盾破裂',shield:'护盾已展开',barrier:'路障',crash:'撞毁！',double:'全机起飞'})[e.kind]||'技能生效',e.kind==='blocked'||e.kind==='shield'?'#368fa9':'#d58a38');
     }
   }
   async animate(player,piece,route) {

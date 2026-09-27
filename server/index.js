@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {randomBytes,randomInt} from 'node:crypto';
 import {Server} from 'socket.io';
 import {loadRooms,saveRooms} from './room-store.js';
-import {createState,roll,move,endTurn,legalPieces,chooseAI,chooseAICard,useCard,COLORS} from '../src/engine.js';
+import {createState,roll,move,endTurn,legalPieces,chooseAI,chooseAICard,useCard,discardCard,autoDiscard,COLORS} from '../src/engine.js';
 
 export function createGameServer({rollDie=()=>randomInt(1,7),turnMs=60000,cardRandom=max=>randomInt(max),storagePath=null,roomTtlMs=24*60*60*1000,botDelayMs=900}={}) {
   const rooms=new Map(loadRooms(storagePath,roomTtlMs).map(r=>[r.code,r])),root=resolve(fileURLToPath(new URL('../dist',import.meta.url)));
@@ -30,7 +30,7 @@ export function createGameServer({rollDie=()=>randomInt(1,7),turnMs=60000,cardRa
   const hostOf=r=>r.members.find(m=>!m.bot&&m.socketId)?.id??r.members.find(m=>!m.bot)?.id;
   function snapshot(r,memberId){
     const state=r.state?structuredClone(r.state):null;
-    if(state)state.players.forEach((p,i)=>{if(r.members[i].id!==memberId)p.hand=p.hand.map(()=>null);});
+    if(state)state.players.forEach((p,i)=>{if(r.members[i].id!==memberId){p.hand=p.hand.map(()=>null);p.pendingCards=(p.pendingCards||[]).map(()=>null);}});
     return {code:r.code,rules:r.rules,revision:r.revision,host:hostOf(r),status:r.state?'playing':'waiting',members:r.members.map(({id,name,socketId,bot},i)=>({id,name,bot:!!bot,connected:!!socketId,color:r.state?.players[i]?.id??i})),state,logs:r.logs,deadline:r.deadline,lastDie:r.lastDie,event:r.event};
   }
   function publish(r,event=null){
@@ -44,6 +44,7 @@ export function createGameServer({rollDie=()=>randomInt(1,7),turnMs=60000,cardRa
     const bot=!!r.members[r.state.current].bot,delay=bot?botDelayMs:turnMs;
     r.deadline=Date.now()+delay;
     r.timer=setTimeout(()=>{
+      autoDiscard(r.state,r.state.players[r.state.current].id);
       if(bot&&r.state.phase==='roll'){
         const chosen=chooseAICard(r.state);
         if(chosen){const actor=r.state.players[r.state.current],result=useCard(r.state,chosen.index,chosen.args,cardRandom);
@@ -55,14 +56,14 @@ export function createGameServer({rollDie=()=>randomInt(1,7),turnMs=60000,cardRa
     },delay);r.timer.unref();
   }
   function doRoll(r){
-    const actor=r.state.players[r.state.current],value=r.state.forcedDie??rollDie();roll(r.state,value);r.lastDie=value;
+    const actor=r.state.players[r.state.current],value=rollDie();roll(r.state,value);r.lastDie=value;
     log(r,`${actor.name}掷出了 ${value} 点`,actor.id);
     if(!legalPieces(r.state).length){log(r,`${actor.name}暂无可移动飞机，交给下一位`,actor.id);endTurn(r.state,cardRandom);}
     arm(r);publish(r,{kind:'roll',value});
   }
   function doMove(r,piece){
     const actor=r.state.players[r.state.current],result=move(r.state,piece,cardRandom);if(!result)throw Error('请选择可以移动的飞机');
-    log(r,`${actor.name}的 ${piece+1} 号飞机${result.from<0?'起飞啦':'完成移动'}${result.flight?'，飞越特别航线':''}${result.captured.length?'，撞回对手飞机':''}${result.blocked.length?'，对手护盾抵挡撞击':''}${result.barrier!==undefined?'，遇到路障停止':''}${result.target===56?'，抵达终点':''}`,actor.id);
+    log(r,`${actor.name}的 ${piece+1} 号飞机${result.from<0?'起飞啦':'完成移动'}${result.flight?'，飞越特别航线':''}${result.captured.length?'，撞回对手飞机':''}${result.blocked.length?'，对手护盾抵挡撞击':''}${result.barrier!==undefined?'，碰到路障，飞机撞毁回机场':''}${result.target===56?'，抵达终点':''}`,actor.id);
     endTurn(r.state,cardRandom);arm(r);publish(r,{kind:'move',player:actor.id,piece,route:result.route,effects:result.effects});
   }
   io.on('connection',socket=>{
@@ -113,12 +114,20 @@ export function createGameServer({rollDie=()=>randomInt(1,7),turnMs=60000,cardRa
       const r=getRoom();if(!r?.state)throw Error('对局还未开始');
       if(r.revision!==revision)throw Error('棋盘已更新，请重新操作');
       if(r.members[r.state.current]?.bot||r.members[r.state.current]?.id!==socket.data.member)throw Error('还没轮到你');
+      if(r.state.players[r.state.current].pendingCards?.length)throw Error('请先选择弃牌');
       if(r.state.phase!==phase)throw Error('当前不能执行这个操作');return r;
     }
+    handler('discard',({revision,index})=>{
+      const r=getRoom();if(!r?.state||r.revision!==revision)throw Error('棋盘已更新，请重新操作');
+      const seat=r.members.findIndex(m=>m.id===socket.data.member&&!m.bot);
+      if(seat<0||!discardCard(r.state,r.state.players[seat].id,index))throw Error('当前不能弃掉这张牌');
+      log(r,'已完成弃牌选择',r.state.players[seat].id);publish(r,{kind:'discard'});return {};
+    });
     handler('card',({revision,index,args})=>{
       const r=authorize(revision,'roll'),actor=r.state.players[r.state.current];
       const result=useCard(r.state,index,args,cardRandom);
       if(!result)throw Error('此卡当前不可用，请检查目标或等待下次行动');
+      if(r.state.phase==='won')arm(r);
       log(r,result.text,actor.id);publish(r,{kind:'card',card:result.kind,effects:result.effects});return {};
     });
     handler('roll',({revision})=>{doRoll(authorize(revision,'roll'));return {};});

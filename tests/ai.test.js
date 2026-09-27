@@ -16,7 +16,7 @@ test('AI changes its decision when shields remove next-roll collision risk',()=>
 });
 test('AI chooses the winning fixed die and preserves advanced planes instead of recycling for cards',()=>{
   const s=createState({rules:'skills'});s.players[0].pieces=[55,56,56,56];s.players[0].hand=['dice'];
-  assert.deepEqual(chooseAICard(s),{index:0,args:{value:1}});
+  assert.deepEqual(chooseAICard(s),{index:0,args:{piece:0,value:1}});
   const t=createState({rules:'skills'});t.players[0].pieces=[50,51,53,55];t.players[0].hand=['recycle'];assert.equal(chooseAICard(t),null);
 });
 test('AI planning does not mutate live state or depend on opponents hidden card faces',()=>{

@@ -22,12 +22,12 @@ test('launch pads are outside the shared track, and flights cross straight over 
     assert.equal(tileColor(globalIndex({id},2)),id);
   }
 });
-test('only six launches, launch ends at start and six grants another turn',()=>{
+test('odd dice cannot launch; six launches and grants another turn',()=>{
   const s=createState();roll(s,3);assert.deepEqual(legalPieces(s),[]);endTurn(s);assert.equal(s.current,1);
   roll(s,6);assert.deepEqual(legalPieces(s),[0,1,2,3]);move(s,0);assert.equal(s.players[1].pieces[0],0);endTurn(s);assert.equal(s.current,1);assert.equal(s.phase,'roll');
 });
 test('invalid actions do not mutate state',()=>{
-  const s=createState();assert.equal(move(s,0),null);assert.equal(roll(s,7),false);roll(s,2);assert.equal(roll(s,6),false);assert.equal(move(s,0),null);
+  const s=createState();assert.equal(move(s,0),null);assert.equal(roll(s,7),false);roll(s,3);assert.equal(roll(s,6),false);assert.equal(move(s,0),null);
 });
 test('same color jumps and a marked flight can follow a jump',()=>{
   assert.equal(previewMove(3,3).target,10);assert.equal(previewMove(13,1).target,30);assert.equal(previewMove(17,1).flight,true);assert.equal(previewMove(29,1).target,34);
@@ -40,7 +40,7 @@ test('landing captures every enemy on square, but not own pieces or transit',()=
   assert.equal(r.captured.length,2);assert.deepEqual(s.players[1].pieces,[-1,-1,1,-1]);assert.equal(s.players[0].pieces[1],15);
 });
 test('jump departure landing and final landing both capture',()=>{
-  const s=createState();s.players[0].pieces[0]=17;s.players[1].pieces=[5,17,-1,-1];roll(s,1);const r=move(s,0);assert.equal(r.captured.length,2);assert.equal(r.target,30);
+  const s=createState();s.players[0].pieces[0]=17;s.players[1].pieces=[5,17,-1,-1];roll(s,1);const r=move(s,0);assert.equal(r.captured.length,2);assert.equal(r.target,34);
 });
 test('launching does not collide with the outer ring, and launch pads cannot be captured',()=>{
   const s=createState();s.players[1].pieces[0]=39;roll(s,6);assert.equal(move(s,0).captured.length,0);
@@ -61,5 +61,35 @@ test('seeded full games terminate with legal states and AI choices',()=>{
     const s=createState({count:seed%3+2});let turns=0;
     while(s.phase!=='won'&&turns++<10000){roll(s,next());const piece=chooseAI(s);if(piece!==undefined){assert.ok(legalPieces(s).includes(piece));move(s,piece);}endTurn(s);assert.ok(s.players.every(p=>p.pieces.every(v=>v>=-1&&v<=56)));}
     assert.equal(s.phase,'won',`seed ${seed} failed to terminate`);
+  }
+});
+
+
+test('direct flight entry flies then jumps; jump into entry does not jump twice',()=>{
+  assert.deepEqual(previewMove(17,1).route,[18,30,34]);
+  assert.deepEqual(previewMove(13,1).route,[14,18,30]);
+  for(let id=0;id<4;id++){
+    const s=createState();s.current=id;s.players[id].pieces[0]=17;
+    roll(s,1);assert.equal(move(s,0).target,34);
+  }
+});
+
+test('flight chain captures each landing but not crossed cells; barriers stop either segment',()=>{
+  const s=createState({rules:'skills',rng:()=>0});
+  s.players[0].pieces[0]=17;s.players[1].pieces=[5,17,21,19];
+  roll(s,1);assert.equal(move(s,0,()=>0).captured.length,3);
+  assert.deepEqual(s.players[1].pieces,[-1,-1,-1,19]);
+  for(const [cell,target] of [[18,-1],[30,-1],[34,-1],[32,34]]){
+    const t=createState();t.players[0].pieces[0]=17;t.barriers=[globalIndex(t.players[0],cell)];
+    roll(t,1);assert.equal(move(t,0).target,target);
+    assert.equal(t.barriers.length,cell===32?1:0);
+  }
+});
+
+
+test('two and four launch in classic and skills without an extra roll',()=>{
+  for(const rules of ['classic','skills'])for(const value of [2,4]){
+    const s=createState({rules});roll(s,value);assert.deepEqual(legalPieces(s),[0,1,2,3]);
+    assert.equal(move(s,0).target,0);endTurn(s);assert.equal(s.current,1);
   }
 });

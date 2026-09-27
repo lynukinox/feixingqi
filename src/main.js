@@ -1,5 +1,5 @@
 import './style.css';
-import { createState, COLORS, NAMES, FINISH, roll, move, endTurn, legalPieces, chooseAI, CARDS, useCard, chooseAICard } from './engine.js';
+import { createState, COLORS, NAMES, FINISH, roll, move, endTurn, legalPieces, chooseAI, CARDS, useCard, discardCard, autoDiscard, chooseAICard } from './engine.js';
 import { mountBoard } from './board.js';
 import { mountOnline, escapeHTML } from './online.js';
 import './online.css';
@@ -14,11 +14,11 @@ app.innerHTML=`
   <header class="header"><a class="brand" href="./"><span class="brand-icon">${planeIcon}</span><span>云端飞行棋<small>CLOUD HOP</small></span></a><div class="header-right"><span class="local-badge"><i></i> 本地畅玩</span><button class="icon-button" id="sound" title="开启音效" aria-label="开启音效">♫</button><button class="help-button" id="rules">玩法指南 <span>↗</span></button></div></header>
   <main><section class="intro"><div><div class="eyebrow"><span></span> 准备登机 · CLOUD HOP</div><h1>下一站，一起起飞<span>。</span></h1><p>一张技能卡，一次漂亮反击。和好友开启新的航程。</p></div><div class="intro-tag"><span>✦</span> 2–4 人同行 · 好友实时对战</div></section>
   <div class="game-layout"><section class="board-panel"><div class="board-toolbar"><div><span class="live-dot"></span><strong>经典飞行棋盘</strong><span class="toolbar-divider"></span><span id="mode-label">人机对战 · 4 位飞行员</span></div><span class="round-label">回合 <b id="turn">01</b></span></div><div id="table-hands" class="table-hands" aria-label="所有玩家的手牌数量" hidden></div><div id="board" role="img" aria-label="飞行棋棋盘；可使用右侧飞机按钮操作"></div><div class="board-footer"><span>✧ <span id="board-tip">准备好了，就掷出第一颗骰子</span></span><span class="direction">↻ 顺时针飞行</span></div></section>
-  <aside><section class="control-panel"><div class="section-label">本次行动 · YOUR TURN <span>✧</span></div><div class="turn-heading"><span class="player-avatar" id="active-avatar">${planeIcon}</span><div><h2 id="active-name">轮到你起飞</h2><p id="status">掷出 6 点，让飞机出发</p></div></div><div class="dice-area"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div id="dice" class="dice" role="img" aria-label="骰子：等待投掷"></div><span id="dice-caption">好运正在等你</span></div><button id="roll" class="primary-button">掷骰子 <span>↗</span></button><div class="keyboard-tip">按 <kbd>Space</kbd> 也可以掷骰子</div><div id="piece-actions" class="piece-actions" aria-label="选择移动的飞机"></div><div class="divider"></div><div class="players-title"><h3>飞行员名单</h3><span id="player-count">4 PLAYERS</span></div><div id="players"></div><button id="new-game" class="secondary-button"><span>↻</span> 开始新对局</button></section><section class="log-panel"><div class="players-title"><h3>飞行动态</h3><span class="log-dot"></span></div><div id="log" aria-live="polite"></div></section></aside></div>
-  <section class="tips"><div><span class="tip-icon">⚄</span><div><h3>掷到 6，即可起飞</h3><p>还能获得一次额外投掷机会</p></div></div><div><span class="tip-icon">↗</span><div><h3>同色跳跃，快人一步</h3><p>落在同色格，向前跳 4 格</p></div></div><div><span class="tip-icon">⚑</span><div><h3>四架归航，赢得胜利</h3><p>让所有飞机率先抵达终点</p></div></div></section>
+  <aside><section class="control-panel"><div class="section-label">本次行动 · YOUR TURN <span>✧</span></div><div class="turn-heading"><span class="player-avatar" id="active-avatar">${planeIcon}</span><div><h2 id="active-name">轮到你起飞</h2><p id="status">掷出 2、4、6 点，让飞机出发</p></div></div><div class="dice-area"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div id="dice" class="dice" role="img" aria-label="骰子：等待投掷"></div><span id="dice-caption">好运正在等你</span></div><button id="roll" class="primary-button">掷骰子 <span>↗</span></button><div class="keyboard-tip">按 <kbd>Space</kbd> 也可以掷骰子</div><div id="piece-actions" class="piece-actions" aria-label="选择移动的飞机"></div><div class="divider"></div><div class="players-title"><h3>飞行员名单</h3><span id="player-count">4 PLAYERS</span></div><div id="players"></div><button id="new-game" class="secondary-button"><span>↻</span> 开始新对局</button></section><section class="log-panel"><div class="players-title"><h3>飞行动态</h3><span class="log-dot"></span></div><div id="log" aria-live="polite"></div></section></aside></div>
+  <section class="tips"><div><span class="tip-icon">⚄</span><div><h3>掷到 2、4、6，即可起飞</h3><p>其中 6 点可额外投掷一次</p></div></div><div><span class="tip-icon">↗</span><div><h3>同色跳跃，快人一步</h3><p>落在同色格，向前跳 4 格</p></div></div><div><span class="tip-icon">⚑</span><div><h3>四架归航，赢得胜利</h3><p>让所有飞机率先抵达终点</p></div></div></section>
   <footer><span>${planeIcon} 小小棋盘，大大快乐。 <a href="/BOARD-LICENSE.txt" target="_blank" rel="noopener">棋盘图 © Mliu92 · CC BY-SA 4.0</a></span><span>用一点运气，换一段好时光 <span class="footer-star">✦</span></span></footer></main>
-  <dialog id="setup-dialog"><form id="setup-form"><button type="button" class="close" aria-label="关闭">×</button><div class="modal-icon">${planeIcon}</div><div class="eyebrow">READY FOR TAKEOFF</div><h2>开启一段新航程</h2><p>选好飞行伙伴，下一站是快乐。</p><label>对战模式</label><div class="segmented"><label><input type="radio" name="mode" value="ai" checked/><span>人机对战<small>和电脑轻松玩</small></span></label><label><input type="radio" name="mode" value="local"/><span>朋友同屏<small>轮流操作，一起玩</small></span></label></div><label for="game-rules">游戏玩法</label><select id="game-rules" name="rules"><option value="classic">经典模式</option><option value="skills">技能模式 · 8 种技能卡</option></select><label for="count">飞行员人数</label><select id="count" name="count"><option value="2">2 位飞行员</option><option value="3">3 位飞行员</option><option value="4" selected>4 位飞行员</option></select><p class="modal-note">开始新对局会重置当前棋盘。手机联网请点右上角「好友联机」。</p><button class="primary-button" type="submit">准备好了，出发 ↗</button></form></dialog>
-  <dialog id="rules-dialog"><button class="close" aria-label="关闭">×</button><div class="eyebrow">HOW TO PLAY</div><h2>你的飞行小手册</h2><p>本局使用以下规则，2–4 位飞行员顺时针轮流行动。</p><ol class="rules-list"><li><b>起飞与连掷</b><span>掷出 6 点可将一架飞机放到独立起飞区，或移动航线上的飞机。掷出 6 点后再掷一次，连续次数不限。</span></li><li><b>移动与跳跃</b><span>点击发光的飞机，或右侧的编号按钮。落在同色外环格时前跳 4 格；起飞区不触发跳跃。</span></li><li><b>特别航线</b><span>落在自己颜色的 ✈ 格（离开起飞区后的第 18 格），可沿虚线飞跃 12 格；同色跳跃也可以衔接这段飞行。</span></li><li><b>撞机与叠机</b><span>落点上的对手飞机返回机场，包括跳跃前的落点和最终落点。经过的格子不撞机；己方飞机可叠放，仍单独移动。</span></li><li><b>精准归航</b><span>绕行后进入同色终点跑道。必须恰好到达中心「终」格；点数过多会向后退回剩余步数。四架全部归航即获胜。</span></li></ol><p class="modal-note">这是便于轻松游玩的统一规则版本；不包含叠机封路、跨线撞机与三次 6 点处罚。</p><h3>技能模式</h3><p>开局每人随机两张，所有玩家各完成一次回合算一轮，6 点连掷不另算轮。每完成五轮，每人补一张。每架飞机归航或被撞毁，机主补一张，最多五张，满手不补发。八种卡等概率抽取，可重复。</p><p>所有卡都在掷骰前使用，每次掷骰及移动最多主动用一张。护盾自动生效，不占出牌次数。公共航道以外的飞机不能发射或遭受导弹。路障不能放在有飞机或已有路障的格子。</p><ul class="skill-rule-list">${Object.values(CARDS).map(c=>`<li><b>${c.name}</b>：${c.description}</li>`).join('')}</ul><p>回收不触发撞毁补卡。护盾抵挡时不补卡。联机只能看到自己的牌，同屏模式请轮流操作。</p></dialog>
+  <dialog id="setup-dialog"><form id="setup-form"><button type="button" class="close" aria-label="关闭">×</button><div class="modal-icon">${planeIcon}</div><div class="eyebrow">READY FOR TAKEOFF</div><h2>开启一段新航程</h2><p>选好飞行伙伴，下一站是快乐。</p><label>对战模式</label><div class="segmented"><label><input type="radio" name="mode" value="ai" checked/><span>人机对战<small>和电脑轻松玩</small></span></label><label><input type="radio" name="mode" value="local"/><span>朋友同屏<small>轮流操作，一起玩</small></span></label></div><label for="game-rules">游戏玩法</label><select id="game-rules" name="rules"><option value="classic">经典模式</option><option value="skills">技能模式 · 9 种技能卡</option></select><label for="count">飞行员人数</label><select id="count" name="count"><option value="2">2 位飞行员</option><option value="3">3 位飞行员</option><option value="4" selected>4 位飞行员</option></select><p class="modal-note">开始新对局会重置当前棋盘。手机联网请点右上角「好友联机」。</p><button class="primary-button" type="submit">准备好了，出发 ↗</button></form></dialog>
+  <dialog id="rules-dialog"><button class="close" aria-label="关闭">×</button><div class="eyebrow">HOW TO PLAY</div><h2>你的飞行小手册</h2><p>本局使用以下规则，2–4 位飞行员顺时针轮流行动。</p><ol class="rules-list"><li><b>起飞与连掷</b><span>掷出 2、4、6 点可将一架飞机放到独立起飞区，或移动航线上的飞机。掷出 6 点后再掷一次，连续次数不限。</span></li><li><b>移动与跳跃</b><span>点击发光的飞机，或右侧的编号按钮。落在同色外环格时前跳 4 格；起飞区不触发跳跃。</span></li><li><b>特别航线</b><span>落在自己颜色的 ✈ 格（离开起飞区后的第 18 格），可沿虚线飞跃 12 格；直接落在飞跃起点时，飞越后再跳 4 格；先同色跳跃到起点再飞越时，不再追加跳跃。</span></li><li><b>撞机与叠机</b><span>落点上的对手飞机返回机场，包括跳跃前的落点及每段跳跃、飞越的落点。经过的格子不撞机；己方飞机可叠放，仍单独移动。</span></li><li><b>精准归航</b><span>绕行后进入同色终点跑道。必须恰好到达中心「终」格；点数过多会向后退回剩余步数。四架全部归航即获胜。</span></li></ol><p class="modal-note">这是便于轻松游玩的统一规则版本；不包含叠机封路、跨线撞机与三次 6 点处罚。</p><h3>技能模式</h3><p>开局每人随机两张，所有玩家各完成一次回合算一轮，6 点连掷不另算轮。每完成五轮，每人补一张。每架飞机归航或被撞毁，机主补一张，最多五张，满手拿牌时可选择弃掉旧牌或新牌。九种卡等概率抽取，可重复。</p><p>所有卡都在掷骰前使用，同一回合可连续使用多张，掷骰后须先完成移动；6 点连掷前也可继续出牌。护盾自动生效，不占出牌次数。导弹以己方飞机为中心攻击前后 3 格，包括其他友机但排除发射飞机；公共航道以外的飞机不受影响。路障不能放在有飞机或已有路障的格子。</p><ul class="skill-rule-list">${Object.values(CARDS).map(c=>`<li><b>${c.name}</b>：${c.description}</li>`).join('')}</ul><p>回收不触发撞毁补卡。护盾抵挡时不补卡。联机只能看到自己的牌，同屏模式请轮流操作。</p></dialog>
   <dialog id="win-dialog"><div class="win-art">✦</div><div class="eyebrow">ALL FLIGHTS ARRIVED</div><h2 id="win-title"></h2><p id="win-description"></p><button id="play-again" class="primary-button">再来一局 ↗</button></dialog>
   <div id="announcement" class="sr-only" aria-live="polite"></div>`;
 
@@ -26,7 +26,7 @@ const $=s=>document.querySelector(s);
 let state=createState(),busy=false,generation=0,timer=null,sound=false,audio=null,online=null;
 let logs=[{text:'欢迎来到云端，祝你一路好运！',color:'#7c8e7d'}];
 const {scene}=mountBoard('board',selectPiece);
-const skills=mountSkills({getState:()=>state,getOnline:()=>online,isBusy:()=>busy,play:playCard});
+const skills=mountSkills({getState:()=>state,getOnline:()=>online,isBusy:()=>busy,play:playCard,discard:discardSelected});
 const feedback=mountFeedback();
 let lastRoomRevision=null,lastRoomCode=null;
 const roster=document.createElement('details');roster.className='roster-details';
@@ -49,9 +49,9 @@ function render() {
   document.documentElement.style.setProperty('--active',COLORS[player.id]);
   $('#active-avatar').style.background=COLORS[player.id];
   $('#active-name').textContent=state.phase==='won'?'全部归航，漂亮！':human?(player.name==='你'?'轮到你起飞':`轮到${player.name}`):`${player.name} 正在飞行`;
-  let status=state.phase==='won'?'本次航程已结束':busy?'飞机正在航线上飞行':state.phase==='choose'?(available.length?'选择一架飞机，继续航程':'暂时没有可以移动的飞机'):player.ai?'正在酝酿好运…':'掷出 6 点，让飞机出发';
+  let status=state.phase==='won'?'本次航程已结束':busy?'飞机正在航线上飞行':state.phase==='choose'?(available.length?'选择一架飞机，继续航程':'暂时没有可以移动的飞机'):player.ai?'正在酝酿好运…':'掷出 2、4、6 点，让飞机出发';
   $('#status').textContent=status; $('#announcement').textContent=`${$('#active-name').textContent}，${status}`;
-  $('#roll').disabled=busy||!human||state.phase!=='roll';
+  $('#roll').disabled=busy||!human||state.phase!=='roll'||!!player.pendingCards?.length;
   $('#roll').innerHTML=state.phase==='won'?'航程圆满结束':busy?'飞行中…':player.ai?'等待电脑行动…':state.phase==='choose'?'请先选择飞机':'掷骰子 <span>↗</span>';
   $('#turn').textContent=String(state.turn).padStart(2,'0');
   $('#player-count').textContent=`${state.players.length} PLAYERS`;
@@ -75,11 +75,21 @@ function scheduleAI() {
   clearTimeout(timer);
   if(!online?.room&&state.phase==='roll'&&state.players[state.current].ai) timer=setTimeout(throwDie,950);
 }
+async function discardSelected(id,index){
+  if(busy)return;
+  if(online?.room){await online.command('discard',{index});return;}
+  if(discardCard(state,id,index)){log('已完成弃牌选择',id);render();scheduleAI();}
+}
 async function playCard(index,args){
   if(busy||state.players[state.current].ai)return;
   if(online?.room){if(online.canPlay())await online.command('card',{index,args});return;}
   const actor=state.players[state.current],result=useCard(state,index,args);
-  if(result){log(result.text,actor.id);beep(700);}render();if(result)playEffects(result.effects);
+  if(result){log(result.text,actor.id);beep(700);}render();if(result)playEffects(result.effects);if(state.phase==='won')showCardWin();
+}
+function showCardWin(){
+  const winner=state.players.find(p=>p.id===state.winner);
+  $('#win-title').textContent=`${winner.name}获胜！`;$('#win-description').textContent='四架飞机全部归航！';
+  if(!$('#win-dialog').open)$('#win-dialog').showModal();
 }
 function playEffects(effects=[]){scene.playEffects(effects);effects.filter(e=>e.kind==='steal').forEach(feedback.steal);}
 async function throwDie() {
@@ -87,14 +97,20 @@ async function throwDie() {
   if(online?.room){if(online.canPlay())await online.command('roll');return;}
   if(busy||state.phase!=='roll'||document.querySelector('dialog[open]')) return;
   if(state.players[state.current].ai){
-    const chosen=chooseAICard(state);
-    if(chosen){const result=useCard(state,chosen.index,chosen.args);if(result){log(result.text,state.players[state.current].id);playEffects(result.effects);}}
+    autoDiscard(state,state.players[state.current].id);
+    // Bound AI deliberation; humans may keep playing any legal cards.
+    for(let used=0;used<10;used++){
+      const chosen=chooseAICard(state);if(!chosen)break;
+      const result=useCard(state,chosen.index,chosen.args);if(!result)break;
+      log(result.text,state.players[state.current].id);playEffects(result.effects);
+    }
   }
+  if(state.phase==='won'||state.players[state.current].pendingCards?.length){render();if(state.phase==='won')showCardWin();return;}
   const token=generation; busy=true;render();$('#dice').classList.add('rolling');
   for(let i=0;i<9;i++) {drawDie(1+Math.floor(Math.random()*6));beep(320+i*40);await delay(65);if(token!==generation)return;}
   const random=new Uint32Array(1);let value;
   do { crypto.getRandomValues(random);value=random[0]; } while(value>=4294967292);
-  const n=state.forcedDie??(1+value%6);roll(state,n);drawDie(n);$('#dice').classList.remove('rolling');
+  const n=1+value%6;roll(state,n);drawDie(n);$('#dice').classList.remove('rolling');
   $('#dice-caption').textContent=n===6?'是 6！好运加一程':`${n} 点，向快乐前进`;
   const player=state.players[state.current];log(`${player.name}掷出了 ${n} 点${n===6?'，可以额外掷一次':''}`,player.id);
   busy=false;render();
@@ -112,8 +128,8 @@ async function selectPiece(piece) {
   const result=move(state,piece);
   await scene.animate(player,piece,result.route);if(token!==generation)return;
   beep(result.target===FINISH?880:640);playEffects(result.effects);
-  let message=result.from<0?`${player.name}的 ${piece+1} 号飞机起飞啦`:`${player.name}的 ${piece+1} 号飞机前进 ${state.die} 格`;
-  if(result.barrier!==undefined)message+='，被路障截停';if(result.blocked.length)message+='，对手护盾挡住撞击';if(result.jump)message+='，同色跳跃';if(result.flight)message+='，飞越特别航线';if(result.captured.length)message+=`，撞回 ${result.captured.length} 架飞机`;if(result.target===FINISH)message+='，顺利归航！';
+  let message=result.from<0?`${player.name}的 ${piece+1} 号飞机起飞啦`:`${player.name}的 ${piece+1} 号飞机前进 ${result.steps} 格`;
+  if(result.barrier!==undefined)message+='，碰到路障，飞机撞毁回机场';if(result.blocked.length)message+='，对手护盾挡住撞击';if(result.jump)message+='，同色跳跃';if(result.flight)message+='，飞越特别航线';if(result.captured.length)message+=`，撞回 ${result.captured.length} 架飞机`;if(result.target===FINISH)message+='，顺利归航！';
   log(message,player.id);
   if(state.phase==='won') {busy=false;render();$('#win-title').textContent=`${player.name==='你'?'你赢啦':player.name+'获胜'}！`;$('#win-description').textContent=`四架飞机全部归航，历经 ${state.turn} 个回合。下一次，也要一起飞。`;$('#win-dialog').showModal();return;}
   endTurn(state);busy=false;render();scheduleAI();

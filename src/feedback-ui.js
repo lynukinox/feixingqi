@@ -13,7 +13,7 @@ export function mountFeedback(){
     if(fresh.length){
       notices.innerHTML=fresh.slice(-4).map(n=>{
         const p=state.players.find(p=>p.id===n.player);
-        return `<div style="--notice-color:${COLORS[n.player]}"><b>${escapeHTML(p?.name||'玩家')}</b> ${escapeHTML(n.reason)}${n.added?` +${n.added}`:''}${n.missed?` · 手牌已满${n.added?'，其余不补发':''}`:''}</div>`;
+        return `<div style="--notice-color:${COLORS[n.player]}"><b>${escapeHTML(p?.name||'玩家')}</b> ${escapeHTML(n.reason)}${n.added?` +${n.added}`:''}${n.pending?` · ${n.pending} 张待选择弃牌`:''}${n.missed?` · 手牌已满${n.added?'，其余不补发':''}`:''}</div>`;
       }).join('');clearTimeout(timer);timer=setTimeout(()=>notices.replaceChildren(),6500);
     }
     if(state.phase==='won'){
