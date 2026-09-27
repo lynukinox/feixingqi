@@ -12,7 +12,7 @@ await page.addInitScript(()=>{
   const original=crypto.getRandomValues.bind(crypto);
   crypto.getRandomValues=array=>{if(array instanceof Uint32Array&&array.length===1){array[0]=window.__diceValues.shift()??0;return array;}return original(array);};
 });
-await page.goto('http://127.0.0.1:5173',{waitUntil:'networkidle'});
+await page.goto(process.env.GAME_URL||'http://127.0.0.1:5173',{waitUntil:'networkidle'});
 await page.locator('#board canvas').waitFor();await page.waitForTimeout(1000);
 await page.screenshot({path:'artifacts/desktop.png',fullPage:true});
 await page.locator('#roll').click();await page.locator('[data-piece="0"]').waitFor();

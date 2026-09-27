@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLORS, FINISH, position, rotatePoint, legalPieces } from './engine.js';
+import { COLORS, FINISH, position, rotatePoint, legalPieces, RING } from './engine.js';
 
 const SIZE=950;
 const xy=([x,y])=>({x,y});
@@ -7,7 +7,7 @@ const color=id=>Phaser.Display.Color.HexStringToColor(COLORS[id]).color;
 const plane='M 0 -18 L 4 -5 L 17 3 L 17 8 L 4 4 L 4 12 L 9 16 L 9 20 L 0 16 L -9 20 L -9 16 L -4 12 L -4 4 L -17 8 L -17 3 L -4 -5 Z';
 
 export class Board extends Phaser.Scene {
-  constructor(onPiece) {super('board');this.onPiece=onPiece;this.ready=false;this.tokens=[];}
+  constructor(onPiece) {super('board');this.onPiece=onPiece;this.ready=false;this.tokens=[];this.skillMarkers=[];}
   preload() {this.load.svg('traditional-board','/board.svg',{width:1425,height:1425});}
   create() {
     let loaded=0;
@@ -56,6 +56,23 @@ export class Board extends Phaser.Scene {
   sync(state,controllableId=null) {
     this.pending=state;this.controllableId=controllableId;if(!this.ready)return;
     this.tokens.forEach(t=>{this.tweens.killTweensOf(t);t.destroy();});this.tokens=[];
+    this.skillMarkers.forEach(m=>m.destroy());this.skillMarkers=[];
+    if(state.rules==='skills'){
+      RING.forEach(([x,y],i)=>this.skillMarkers.push(this.label(x,y+16,String(i+1),10,'#425845').setDepth(2)));
+      for(const cell of state.barriers){
+        const [x,y]=RING[cell],barrier=this.add.container(x,y).setDepth(9),g=this.add.graphics();
+        g.fillStyle(0x42200d,.25).fillEllipse(0,20,48,12);
+        g.fillStyle(0xffe89a,.9).fillCircle(0,0,26);
+        g.lineStyle(3,0xffffff).strokeCircle(0,0,26);
+        g.fillStyle(0x654736).fillRoundedRect(-18,0,6,21,2).fillRoundedRect(12,0,6,21,2);
+        g.fillStyle(0x432f26).fillRoundedRect(-23,17,16,5,2).fillRoundedRect(7,17,16,5,2);
+        g.fillStyle(0xffffff).fillRoundedRect(-25,-16,50,27,4);
+        g.fillStyle(0xf46b20).fillRoundedRect(-23,-14,46,23,3);
+        for(const left of [-21,-5,11])g.fillStyle(0xffffff).fillTriangle(left,-12,left+9,-12,left,6).fillTriangle(left+9,-12,left+9,6,left,6);
+        g.lineStyle(2,0x98390e).strokeRoundedRect(-24,-15,48,25,4);
+        barrier.add(g);this.skillMarkers.push(barrier);
+      }
+    }
     const legal=legalPieces(state),current=state.players[state.current];
     state.players.forEach(player=>player.pieces.forEach((p,i)=>{
       const arrived=p===FINISH;
@@ -68,6 +85,7 @@ export class Board extends Phaser.Scene {
       disk.fillStyle(arrived?0xffffff:color(player.id)).fillCircle(0,0,21);
       disk.lineStyle(active?4:2,arrived?color(player.id):0xffffff).strokeCircle(0,0,21);
       if(active)disk.lineStyle(3,color(player.id),.8).strokeCircle(0,0,28);
+      if(player.shields?.[i]&&!arrived)disk.lineStyle(4,0x68daf2).strokeCircle(0,0,32);
       c.add(disk);
       if(arrived)c.add(this.add.text(0,0,'✓',{fontSize:'27px',fontStyle:'bold',color:COLORS[player.id]}).setOrigin(.5));
       else {
@@ -76,9 +94,27 @@ export class Board extends Phaser.Scene {
         c.add([icon,number]);
       }
       c.setSize(52,52).setDepth(active?20:10).setData({player:player.id,piece:i});
-      if(active){c.setInteractive({useHandCursor:true}).on('pointerdown',()=>this.onPiece(i));this.tweens.add({targets:c,scale:1.1,duration:650,yoyo:true,repeat:-1});}
+      if(active){let pressed=null;c.setInteractive({useHandCursor:true}).on('pointerdown',pointer=>{pressed=pointer.id;}).on('pointerout',()=>{pressed=null;}).on('pointerup',pointer=>{if(pressed===pointer.id&&pointer.getDistance()<20)this.onPiece(i);pressed=null;});this.tweens.add({targets:c,scale:1.1,duration:650,yoyo:true,repeat:-1});}
       this.tokens.push(c);
     }));
+  }
+  playEffects(effects=[]){
+    if(!this.ready||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    for(const e of effects){
+      if(!e.at)continue;
+      const [x,y]=e.at;
+      const burst=(text,color)=>{
+        const ring=this.add.circle(x,y,20,Phaser.Display.Color.HexStringToColor(color).color,.22).setStrokeStyle(4,Phaser.Display.Color.HexStringToColor(color).color).setDepth(60);
+        const label=this.label(x,y-35,text,22,color).setDepth(61).setBackgroundColor('#fffffff0');
+        this.tweens.add({targets:ring,scale:2.8,alpha:0,duration:700,onComplete:()=>ring.destroy()});
+        this.tweens.add({targets:label,y:y-80,alpha:0,duration:1100,onComplete:()=>label.destroy()});
+      };
+      if(e.kind==='missile'||e.kind==='recycle'){
+        const [sx,sy]=e.from,projectile=this.label(sx,sy,e.kind==='missile'?'➤':'✈',38,e.kind==='missile'?'#dd673d':'#6384a5').setDepth(65);
+        projectile.setRotation(Math.atan2(y-sy,x-sx));
+        this.tweens.add({targets:projectile,x,y,duration:500,ease:'Sine.easeIn',onComplete:()=>{projectile.destroy();burst(e.kind==='recycle'?'回收 +2':e.blocked?'护盾抵挡':'命中！',e.blocked?'#368fa9':'#d96a38');}});
+      }else burst(({blocked:'护盾破裂',shield:'护盾已展开',barrier:'路障',double:'双机起飞'})[e.kind]||'技能生效',e.kind==='blocked'||e.kind==='shield'?'#368fa9':'#d58a38');
+    }
   }
   async animate(player,piece,route) {
     const token=this.tokens.find(t=>t.getData('player')===player.id&&t.getData('piece')===piece);if(!token)return;
@@ -88,6 +124,6 @@ export class Board extends Phaser.Scene {
 }
 export function mountBoard(parent,onPiece) {
   const scene=new Board(onPiece);
-  const game=new Phaser.Game({type:Phaser.AUTO,parent,width:SIZE,height:SIZE,transparent:true,antialias:true,scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},scene:[scene],render:{pixelArt:false},audio:{noAudio:true}});
+  const game=new Phaser.Game({type:Phaser.AUTO,parent,width:SIZE,height:SIZE,transparent:true,antialias:true,input:{touch:{capture:false},mouse:{preventDefaultWheel:false}},scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},scene:[scene],render:{pixelArt:false},audio:{noAudio:true}});
   return {scene,game};
 }

@@ -6,3 +6,6 @@ artifacts/
 
 .tools/
 *.log
+
+# Private multiplayer snapshots
+data/

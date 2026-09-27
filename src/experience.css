@@ -1,0 +1,39 @@
+#board{position:relative}
+#board-targets{position:absolute;inset:0;z-index:70;background:#15334a22}
+.target-plane,.range-cell{position:absolute;transform:translate(-50%,-50%);border-radius:50%}
+.target-plane{width:5.5%;aspect-ratio:1;min-width:23px;padding:0;border:3px solid white;background:var(--target-color);color:white;box-shadow:0 0 0 3px var(--target-color),0 3px 9px #0005;font-weight:800;font-size:clamp(11px,1.4vw,18px);z-index:2;cursor:pointer}
+.target-plane:hover,.target-plane:focus-visible{outline:4px solid #ffe197;outline-offset:3px;filter:brightness(1.2)}
+.range-cell{width:5.1%;aspect-ratio:1;background:#ffdb6080;border:2px solid #e6a538;pointer-events:none}
+#target-hint{margin:4px 12px 12px;padding:12px;background:#fff4d5;border:1px solid #dfbd77;border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;scroll-margin-top:10px;font-size:13px}
+#target-hint button{border:1px solid #d2b075;background:white;padding:8px;border-radius:8px;white-space:nowrap;color:#705229;font:inherit}
+.selecting-skill #roll{pointer-events:none;opacity:.4}
+#card-notices:empty{display:none}#card-notices{display:grid;gap:5px;margin:12px 0;font-size:12px}
+#card-notices>div{border-left:3px solid var(--notice-color);background:#f1f6f9;padding:9px;border-radius:6px;line-height:1.5;color:#415f76}
+#match-results{margin:20px 0;text-align:left}#match-results>p{font-size:11px;color:#718496}
+#match-results table{width:100%;border-collapse:collapse;font-size:12px}#match-results th,#match-results td{padding:11px 5px;border-bottom:1px solid #dfe5e8}#match-results thead{color:#778795}#match-results tbody tr:first-child{background:#fff1d8}#match-results tbody th{max-width:150px;overflow-wrap:anywhere}#match-results tbody span{color:#c08e49}
+.flying-card{position:fixed;z-index:10000;pointer-events:none;width:55px;height:75px;background:linear-gradient(135deg,#3a6383,#203c53);border:3px solid #e4bc78;border-radius:8px;color:#ffe8c0;display:grid;place-items:center;font-size:11px;box-shadow:0 5px 20px #0003}
+.roster-details>summary{cursor:pointer;font-size:12px;color:#587286;padding:10px 0;list-style:revert}.roster-details .players-title{margin-top:10px}
+@media(min-width:761px){.roster-details>summary{display:none}}
+@media(max-width:760px){
+  aside{display:flex;flex-direction:column}.control-panel{order:0}.room-card{order:1}.log-panel{order:2}
+  body.online-playing .intro{display:none}.online-playing .game-layout{margin-top:12px}
+  .skill-hand{display:flex;overflow-x:auto;gap:7px;padding:3px 1px 8px;scroll-snap-type:x proximity}
+  .skill-card{flex:0 0 86px;min-height:93px;scroll-snap-align:start}.skill-round{margin-top:5px;padding:6px 8px}
+  .control-panel .divider{margin:12px 0 4px}.control-panel .section-label{margin-bottom:10px}.control-panel .turn-heading{margin-bottom:10px}
+  .online-playing #roll{position:static;width:100%;box-shadow:0 4px 12px #253f5817;margin-top:0}
+  .online-playing #piece-actions:not(:empty){position:static;width:100%;box-shadow:none;padding:0;border:0;margin-bottom:8px}
+  body.online-playing{padding-bottom:0}.skills-panel{margin-top:10px;padding:10px 0}.skill-hint{margin:6px 0}
+  #target-hint{font-size:11px;padding:9px}#card-notices{font-size:11px}
+  .online-playing .room-card .room-buttons{margin-top:8px}.online-playing .room-card{padding:13px 17px}
+}
+
+@media(max-width:760px){#card-notices{max-height:82px;overflow-y:auto}.online-playing .control-panel .secondary-button:disabled{display:none}}
+
+/* Keep all nine grid slots, but paint only the pips for the rolled value. */
+.dice{grid-template-rows:repeat(3,minmax(0,1fr));grid-template-columns:repeat(3,minmax(0,1fr));place-items:center;gap:5px;transform:rotate(0deg);flex-shrink:0}
+.dice i{width:10px;height:10px;background:transparent;box-shadow:none}
+.dice i.visible{background:#29465f;box-shadow:inset 0 1px 2px #17314930}
+@media(max-width:760px){.control-panel .turn-heading{min-height:74px;padding-right:78px;align-items:center}.dice-area{top:48px;right:20px;height:60px;width:60px}.dice{width:54px;height:54px;padding:10px;gap:4px}.dice i{width:7px;height:7px}}
+
+/* The board is embedded in a scrolling page, not a full-screen gesture surface. */
+#board canvas,#board-targets{touch-action:pan-y pinch-zoom!important}

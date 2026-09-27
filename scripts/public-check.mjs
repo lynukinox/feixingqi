@@ -53,6 +53,7 @@ try{
   assert.match(await a.locator('#log').innerText(),/号飞机起飞啦/);
   for(const p of[a,b])assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await fs.mkdir('artifacts',{recursive:true});await a.screenshot({path:'artifacts/public-phone.png',fullPage:true});
-  await a.locator('#room-leave').click();await a.locator('#room-leave').click();await b.waitForFunction(()=>document.querySelector('#room-card').hidden);
+  await a.locator('#room-leave').click();await a.locator('#room-leave').click();await b.waitForFunction(()=>document.querySelector('.room-members').textContent.includes('电脑接管'));
+  assert.equal(await b.locator('#room-card').isVisible(),true);await b.locator('#room-leave').click();await b.locator('#room-leave').click();
   assert.deepEqual(errors,[]);console.log('PUBLIC PASS: HTTPS, assets, health, WebSocket, two-device invitation, real dice, legal move synchronization, seat permissions, refresh/reconnect, mobile layout, room exit.');
 }catch(error){console.error(error);process.exitCode=1;}finally{await browser.close();}

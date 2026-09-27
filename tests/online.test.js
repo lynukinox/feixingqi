@@ -11,6 +11,32 @@ async function fixture(t,options={}){
 }
 const call=(socket,event,data={})=>new Promise(resolve=>socket.emit(event,data,resolve));
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+test('skill rooms keep hands private, enforce ownership and revisions, restore on reconnect',async t=>{
+  const {server,client}=await fixture(t,{rollDie:()=>1,cardRandom:()=>0});const a=await client(),b=await client();
+  const created=await call(a,'create',{name:'甲',rules:'skills'});await call(b,'join',{code:created.room.code,name:'乙'});
+  const r=server.rooms.get(created.room.code);await call(a,'start',{revision:r.revision});await wait(15);
+  assert.deepEqual(a.room.state.players[0].hand,['dice','dice']);assert.deepEqual(a.room.state.players[1].hand,[null,null]);
+  assert.deepEqual(b.room.state.players[0].hand,[null,null]);assert.deepEqual(b.room.state.players[1].hand,['dice','dice']);
+  assert.equal((await call(b,'card',{revision:r.revision,index:0,args:{value:6}})).ok,false);
+  assert.equal((await call(a,'card',{revision:r.revision,index:0,args:{value:9}})).ok,false);assert.equal(r.state.players[0].hand.length,2);
+  const revision=r.revision;assert.equal((await call(a,'card',{revision,index:0,args:{value:6}})).ok,true);
+  assert.equal((await call(a,'card',{revision,index:0,args:{value:6}})).ok,false);
+  a.disconnect();await wait(10);const c=await client();const restored=await call(c,'join',{code:r.code,token:created.token});
+  assert.deepEqual(restored.room.state.players[0].hand,['dice']);assert.equal(restored.room.state.forcedDie,6);
+  assert.deepEqual(restored.room.state.players[1].hand,[null,null]);
+  await call(c,'roll',{revision:r.revision,die:2});assert.equal(r.state.die,6);
+  assert.equal((await call(c,'card',{revision:r.revision,index:0,args:{value:1}})).ok,false);
+});
+test('steal stays private in broadcasts and logs and leaves timeout deadline intact',async t=>{
+  const {server,client}=await fixture(t,{cardRandom:()=>0});const a=await client(),b=await client();
+  const made=await call(a,'create',{name:'甲',rules:'skills'});await call(b,'join',{name:'乙',code:made.room.code});
+  const r=server.rooms.get(made.room.code);await call(a,'start',{revision:r.revision});
+  r.state.players[0].hand=['steal'];r.state.players[1].hand=['missile','shield'];const deadline=r.deadline;
+  assert.equal((await call(a,'card',{revision:r.revision,index:0,args:{target:2}})).ok,true);await wait(15);
+  assert.equal(r.deadline,deadline);assert.deepEqual(a.room.state.players[0].hand,['missile']);
+  assert.deepEqual(b.room.state.players[0].hand,[null]);assert.deepEqual(a.room.state.players[1].hand,[null]);
+  assert.ok(!JSON.stringify(b.room.logs).includes('missile'));assert.deepEqual(b.room.state.players[1].hand,['shield']);
+});
 test('two devices synchronize; dice and turn ownership are authoritative; revisions reject duplicates',async t=>{
   const {server,client}=await fixture(t,{rollDie:()=>6});const a=await client(),b=await client();
   const created=await call(a,'create',{name:'小红'});const code=created.room.code;
@@ -36,7 +62,7 @@ test('refresh token restores a seat; lobby host transfers; rooms remain isolated
   await call(renewed,'leave');assert.equal(server.rooms.get(first.room.code).members[0].name,'朋友');
   assert.equal(server.rooms.get(isolated.room.code).members.length,1);
 });
-test('rooms enforce capacity, input validation and no late joins; explicit leave closes active game',async t=>{
+test('rooms enforce capacity, input validation and no late joins; explicit leave retains a bot seat',async t=>{
   const {server,client}=await fixture(t);const clients=await Promise.all(Array.from({length:5},client));
   assert.equal((await call(clients[0],'create',{name:'<img onerror=x>'})).ok,false);
   const created=await call(clients[0],'create',{name:'玩家1'});const code=created.room.code;
@@ -44,7 +70,7 @@ test('rooms enforce capacity, input validation and no late joins; explicit leave
   assert.equal((await call(clients[4],'join',{code,name:'多余玩家'})).ok,false);
   await call(clients[0],'start',{revision:server.rooms.get(code).revision});
   assert.equal((await call(clients[4],'join',{code,name:'迟到'})).ok,false);
-  await call(clients[1],'leave');assert.equal(server.rooms.has(code),false);
+  await call(clients[1],'leave');assert.equal(server.rooms.has(code),true);assert.equal(server.rooms.get(code).members[1].bot,true);
 });
 test('operation timeout advances a stalled game and resume rearms a fully disconnected room',async t=>{
   const {server,client}=await fixture(t,{rollDie:()=>1,turnMs:90});const a=await client(),b=await client();
@@ -52,4 +78,29 @@ test('operation timeout advances a stalled game and resume rearms a fully discon
   await call(a,'start',{revision:r.revision});await wait(115);assert.ok(r.state.turn>=2);
   a.disconnect();b.disconnect();await wait(30);assert.equal(r.timer,null);
   const c=await client();await call(c,'join',{code:r.code,token:joined.token});assert.ok(r.deadline>Date.now());
+});
+
+test('leaving host is replaced by a skill-using bot; ownership transfers, revoked token cannot reclaim and last human deletes room',async t=>{
+  const {server,client}=await fixture(t,{rollDie:()=>1,cardRandom:()=>0,botDelayMs:15});const a=await client(),b=await client();
+  const created=await call(a,'create',{name:'甲',rules:'skills'});const joined=await call(b,'join',{code:created.room.code,name:'乙'});
+  const r=server.rooms.get(created.room.code);await call(a,'start',{revision:r.revision});
+  r.state.players[0].hand=['double'];const before=r.state.players[0].pieces.slice();
+  await call(a,'leave');assert.equal(r.members[0].bot,true);assert.equal(r.state.players[0].ai,true);assert.deepEqual(before,[-1,-1,-1,-1]);
+  assert.equal((await call(a,'join',{code:r.code,token:created.token})).ok,false);
+  for(let i=0;i<30&&r.state.current===0;i++)await wait(10);
+  assert.equal(r.state.current,1);assert.equal(r.state.players[0].stats.cardsUsed,1);assert.ok(r.state.players[0].pieces.some(p=>p>0));
+  assert.equal(b.room.host,joined.memberId);assert.ok(b.room.members[0].bot);assert.ok(b.room.state.players[0].hand.every(c=>c===null));
+  r.state.phase='won';assert.equal((await call(b,'start',{revision:r.revision})).ok,true);assert.equal(r.state.players[0].ai,true);
+  await call(b,'leave');assert.equal(server.rooms.has(r.code),false);
+});
+test('bot takes over a pending move without rerolling; non-current departure does not reset human deadline',async t=>{
+  const {server,client}=await fixture(t,{rollDie:()=>6,botDelayMs:15});const a=await client(),b=await client();
+  const created=await call(a,'create',{name:'甲'});await call(b,'join',{code:created.room.code,name:'乙'});const r=server.rooms.get(created.room.code);
+  await call(a,'start',{revision:r.revision});await call(a,'roll',{revision:r.revision});
+  await call(a,'leave');for(let i=0;i<20&&r.state.moves===0;i++)await wait(10);
+  assert.ok(r.state.moves>0);assert.equal(r.state.players[0].pieces[0],0);
+  await call(b,'leave');assert.equal(server.rooms.size,0);
+  const c=await client(),d=await client();const next=await call(c,'create',{name:'丙'});await call(d,'join',{code:next.room.code,name:'丁'});
+  const room=server.rooms.get(next.room.code);await call(c,'start',{revision:room.revision});const deadline=room.deadline;
+  await call(d,'leave');assert.equal(room.deadline,deadline);assert.equal(room.state.current,0);
 });
