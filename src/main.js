@@ -29,6 +29,7 @@ const {scene}=mountBoard('board',selectPiece);
 const skills=mountSkills({getState:()=>state,getOnline:()=>online,isBusy:()=>busy,play:playCard,discard:discardSelected});
 const feedback=mountFeedback();
 let lastRoomRevision=null,lastRoomCode=null;
+let roomQueue=Promise.resolve(),networkVisual=false,networkEpoch=0;
 const roster=document.createElement('details');roster.className='roster-details';
 const summary=document.createElement('summary');summary.textContent='飞行员名单与归航进度';roster.append(summary);
 const rosterTitle=$('#players').previousElementSibling;rosterTitle.before(roster);roster.append(rosterTitle,$('#players'));
@@ -66,8 +67,9 @@ function render() {
   $('#log').innerHTML=logs.slice(0,4).map((l,i)=>`<div class="log-item ${i?'':'latest'}"><i style="background:${l.color}"></i><p>${escapeHTML(l.text)}</p><span>${i===0?'刚刚':''}</span></div>`).join('');
   $('#new-game').disabled=busy;
   const mine=online?.room?.state?state.players[online.room.members.findIndex(m=>m.id===online.memberId)]?.id:null;
-  scene.sync(state,online?.room?(online.canPlay()?mine:-1):null);
+  if(!networkVisual)scene.sync(state,online?.room?(online.canPlay()?mine:-1):null);
   online?.decorate();
+  if(busy&&online?.room&&online.connected){$('#status').textContent='飞机正在航线上飞行';$('#roll').disabled=true;}
   skills.render();
   feedback.render(state);
 }
@@ -144,10 +146,20 @@ document.querySelectorAll('dialog').forEach(d=>{d.querySelector('.close')?.addEv
 $('#setup-form').addEventListener('submit',e=>{e.preventDefault();generation++;clearTimeout(timer);const data=new FormData(e.target);feedback.reset();state=createState({mode:data.get('mode'),count:Number(data.get('count')),rules:data.get('rules')});busy=false;logs=[];log('新航程已开启，掷出你的第一份好运');$('#setup-dialog').close();drawDie();$('#dice-caption').textContent='好运正在等你';render();scheduleAI();});
 $('#play-again').addEventListener('click',()=>{$('#win-dialog').close();if(online?.room)$('#room-card').scrollIntoView({behavior:'smooth'});else openDialog('#setup-dialog');});
 drawDie();render();
-online=mountOnline({
-  apply(room){
+async function applyRoom(room,epoch){
+    if(epoch!==networkEpoch)return;
     const animate=lastRoomCode===room.code&&lastRoomRevision!==null&&room.revision>lastRoomRevision;
     if(lastRoomCode!==room.code)feedback.reset();lastRoomCode=room.code;lastRoomRevision=room.revision;
+    const event=room.event;
+    if(animate&&event?.kind==='move'&&event.route?.length&&scene.ready){
+      const player=state.players.find(p=>p.id===event.player);
+      if(player){
+        busy=true;render();networkVisual=true;
+        await scene.animate(player,event.piece,event.route);
+        networkVisual=false;
+        if(epoch!==networkEpoch)return;
+      }
+    }
     generation++;clearTimeout(timer);busy=false;$('#dice').classList.remove('rolling');
     state=room.state||createState({mode:'local',count:Math.max(2,room.members.length)});
     if(!animate&&room.state&&room.event?.kind!=='start')feedback.prime(state);
@@ -159,7 +171,14 @@ online=mountOnline({
       if(!$('#win-dialog').open)$('#win-dialog').showModal();
     }else if($('#win-dialog').open)$('#win-dialog').close();
     render();if(animate)playEffects(room.event?.effects);
+}
+online=mountOnline({
+  apply(room){
+    const epoch=networkEpoch;
+    roomQueue=roomQueue.then(()=>applyRoom(room,epoch)).catch(error=>{
+      console.error('Room animation failed',error);networkVisual=false;busy=false;render();
+    });
   },
-  reset(){feedback.reset();lastRoomCode=null;lastRoomRevision=null;generation++;clearTimeout(timer);busy=false;state=createState();logs=[];$('#new-game').innerHTML='<span>↻</span> 开始新对局';$('.local-badge').textContent='本地畅玩';if($('#win-dialog').open)$('#win-dialog').close();drawDie();render();},
+  reset(){networkEpoch++;networkVisual=false;feedback.reset();lastRoomCode=null;lastRoomRevision=null;generation++;clearTimeout(timer);busy=false;state=createState();logs=[];$('#new-game').innerHTML='<span>↻</span> 开始新对局';$('.local-badge').textContent='本地畅玩';if($('#win-dialog').open)$('#win-dialog').close();drawDie();render();},
   refresh:render
 });

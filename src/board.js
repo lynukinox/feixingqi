@@ -129,7 +129,16 @@ export class Board extends Phaser.Scene {
   async animate(player,piece,route) {
     const token=this.tokens.find(t=>t.getData('player')===player.id&&t.getData('piece')===piece);if(!token)return;
     this.tweens.killTweensOf(token);token.setScale(1).setDepth(30);
-    for(const p of route){const point=xy(position(player,p,piece));await new Promise(resolve=>this.tweens.add({targets:token,x:point.x,y:point.y,duration:160,ease:'Sine.easeInOut',onComplete:resolve}));}
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    for(const p of route){
+      if(!token.active)return;
+      const point=xy(position(player,p,piece));
+      await new Promise(resolve=>{
+        const done=()=>{token.off('destroy',done);resolve();};
+        token.once('destroy',done);
+        this.tweens.add({targets:token,x:point.x,y:point.y,duration:160,ease:'Sine.easeInOut',onComplete:done,onStop:done});
+      });
+    }
   }
 }
 export function mountBoard(parent,onPiece) {
