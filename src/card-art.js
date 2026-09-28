@@ -1,0 +1,23 @@
+// Small vector illustrations stay crisp on phones without loading image assets.
+const plane='<path d="M0-19 5-5 19 3v5L5 4v9l6 5v3L0 18l-11 3v-3l6-5V4l-14 4V3L-5-5Z" fill="var(--card-accent)"/><path d="M0-14V13" stroke="#fff" opacity=".65"/>';
+const artwork={
+  dice:'<path d="m39 22 27 6 10 25-23 18-26-17Z" fill="var(--card-accent)" opacity=".14"/><rect x="31" y="24" width="42" height="42" rx="10" fill="#fffaf0" transform="rotate(-12 52 45)"/><g fill="var(--card-accent)" stroke="none"><circle cx="40" cy="36" r="3"/><circle cx="61" cy="32" r="3"/><circle cx="51" cy="45" r="3"/><circle cx="43" cy="58" r="3"/><circle cx="64" cy="54" r="3"/></g><path d="m77 20 3 5 6 1-5 4-1 6-4-5-6-1 5-4Z" fill="#e8bb65" stroke="none"/>',
+  barrier:'<path d="M25 69V30h10v9h11V27h12v12h11v-9h10v39Z" fill="#f4dec5"/><path d="M25 49h54M25 60h54M40 39v10m20 0v11m-20 0v9M58 39v10" opacity=".55"/><path d="M45 69V57a7 7 0 0 1 14 0v12" fill="var(--card-accent)"/><path d="M23 72h58"/>',
+  missile:'<path d="m57 18 5 13 14-4-4 14 14 5-13 8 7 13-17-1-5 14-9-13-15 5 3-15-14-7 14-8-4-14 15 4Z" fill="#f3dbac" stroke="none"/><g transform="translate(52 44) rotate(40)"><path d="M-9 10V-7Q-8-20 0-24 8-20 9-7v17Z" fill="#fff8f0"/><circle cy="-7" r="4" fill="var(--card-accent)"/><path d="m-9 2-8 12 8-2m18-10 8 12-8-2" fill="var(--card-accent)"/><path d="m-5 14 5 13 5-13" fill="#e6a459"/></g>',
+  shield:'<path d="m52 18 26 10v18Q76 64 52 75 28 64 26 46V28Z" fill="#e3f2f2"/><path d="m52 25 19 8v13Q69 59 52 67 35 59 33 46V33Z" fill="#fff"/><path d="m41 45 8 8 15-18" stroke-width="4"/><path d="M52 25v11" opacity=".4"/>',
+  disrupt:'<path d="M23 62V34m58 28V34M19 62h12m44 0h12" stroke-width="4"/><path d="m26 37 18 8m17 0 17-8M27 50h15m21 0h15M34 41v9m36-9v9"/><path d="m51 26-7 13 13 5-9 14 9 9" stroke-width="3"/><path d="M25 73q8-6 16 0t16 0 16 0" opacity=".45"/>',
+  recycle:'<path d="M29 29a29 29 0 0 1 50 17M79 60a29 29 0 0 1-50 4" stroke-width="3"/><path d="m70 42 9 5 5-10M38 62l-10 2-2 10" stroke-width="3"/><g transform="translate(52 47) scale(.75)">'+plane+'</g>',
+  double:'<path d="M27 75V58m21 15V56m29 10V49" stroke-dasharray="3 5" opacity=".6"/><g transform="translate(30 40) scale(.62)">'+plane+'</g><g transform="translate(54 31) scale(.8)">'+plane+'</g><g transform="translate(79 40) scale(.55)">'+plane+'</g>',
+  triple:'<path d="m22 61 20-20-7-7 22-15-7 20 9 5-23 29 5-18Z" fill="#f1ce8a" stroke="none"/><path d="m61 24 16 16-16 16m13-25 9 9-9 9" stroke-width="4"/><text x="64" y="75" text-anchor="middle" fill="var(--card-accent)" stroke="none" font-family="Arial,sans-serif" font-size="22" font-weight="700">×3</text>',
+  retreat:'<path d="M80 29H48Q26 29 26 49t22 20h26" stroke-dasharray="3 5" opacity=".6"/><path d="m42 18-15 12 15 12" stroke-width="4"/><g transform="translate(59 51) rotate(-90) scale(.78)">'+plane+'</g><circle cx="79" cy="69" r="4" fill="#edc47b" stroke="none"/>',
+  steal:'<rect x="24" y="26" width="29" height="41" rx="5" fill="#e7d8c8" transform="rotate(-13 38 46)"/><rect x="51" y="31" width="29" height="41" rx="5" fill="#fff9ee" transform="rotate(12 65 50)"/><path d="m31 20 9-5q18-9 33 11m-1-10 2 11-11-1"/><path d="m63 42 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z" fill="#e5bd78" stroke="none"/>',
+  hidden:'<path d="m52 20 27 27-27 27-27-27Z" fill="var(--card-wash)"/><g transform="translate(52 47) scale(.65)">'+plane+'</g>'
+};
+const metadata={dice:['操控','自选 1–6 点'],barrier:['布置','触碰即拦截'],missile:['攻击','范围 3 格'],shield:['防御','抵挡 1 次'],disrupt:['干扰','对手弃 1 张'],recycle:['补给','撤回 · 抽 2 张'],double:['起飞','全队出发'],triple:['强化','可叠加 2 层'],retreat:['位移','敌我倒退 4 格'],steal:['夺取','随机偷 1 张'],hidden:['未知','等待揭晓']};
+export function cardArt(kind){
+  return `<svg viewBox="0 0 104 88" fill="none" stroke="var(--card-accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="52" cy="75" rx="30" ry="4" fill="var(--card-accent)" stroke="none" opacity=".08"/><circle cx="52" cy="44" r="33" stroke-dasharray="2 5" opacity=".16"/><path d="M15 25h6m-3-3v6M84 63h6m-3-3v6" opacity=".45"/>${artwork[kind]||artwork.hidden}</svg>`;
+}
+export function cardFace(kind,name,status){
+  const [category,detail]=metadata[kind]||metadata.hidden;
+  return `<span class="card-topline"><span>${category}</span><span aria-hidden="true">✦</span></span><span class="card-illustration">${cardArt(kind)}</span><strong>${name}</strong><span class="card-detail">${detail}</span><small class="card-action">${status}</small>`;
+}

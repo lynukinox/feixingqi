@@ -63,7 +63,7 @@ export function createGameServer({rollDie=()=>randomInt(1,7),turnMs=60000,cardRa
   }
   function doMove(r,piece){
     const actor=r.state.players[r.state.current],result=move(r.state,piece,cardRandom);if(!result)throw Error('请选择可以移动的飞机');
-    log(r,`${actor.name}的 ${piece+1} 号飞机${result.from<0?'起飞啦':'完成移动'}${result.flight?'，飞越特别航线':''}${result.captured.length?'，撞回对手飞机':''}${result.blocked.length?'，对手护盾抵挡撞击':''}${result.barrier!==undefined?'，碰到路障，飞机撞毁回机场':''}${result.target===56?'，抵达终点':''}`,actor.id);
+    log(r,`${actor.name}的 ${piece+1} 号飞机${result.from<0?'起飞啦':'完成移动'}${result.flight?'，飞越特别航线':''}${result.captured.length?'，撞回对手飞机':''}${result.shieldStop?'，护盾阻挡，停在目标前一格':result.blocked.length?'，对手护盾抵挡撞击':''}${result.barrierBlocked?'，护盾抵消城墙，停在该格':result.barrier!==undefined?'，碰到城墙，飞机撞毁回机场':''}${result.target===56?'，抵达终点':''}`,actor.id);
     endTurn(r.state,cardRandom);arm(r);publish(r,{kind:'move',player:actor.id,piece,route:result.route,effects:result.effects});
   }
   io.on('connection',socket=>{

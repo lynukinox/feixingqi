@@ -14,7 +14,18 @@ export function mountOnline({apply,reset,refresh}) {
   let socket=null,room=null,memberId=null,pending=false,connected=false,leaving=false;
   $('.header-right').insertAdjacentHTML('afterbegin','<button id="online-open" class="online-open">好友联机 ↗</button>');
   $('.control-panel').insertAdjacentHTML('beforebegin','<section id="room-card" class="room-card" hidden></section>');
-  document.body.insertAdjacentHTML('beforeend',`<dialog id="online-dialog"><button class="close" aria-label="关闭">×</button><div class="eyebrow">FLY TOGETHER, ANYWHERE</div><h2>和好友一起飞</h2><p>各用自己的手机，加入同一个房间。</p><label for="online-name">你的昵称</label><input id="online-name" maxlength="12" autocomplete="nickname" placeholder="输入昵称"/><label for="online-rules">新房间玩法</label><select id="online-rules"><option value="classic">经典模式</option><option value="skills">技能模式 · 9 种技能卡</option></select><button id="room-create" class="primary-button">创建好友房间</button><div class="online-or">或加入好友的房间</div><label for="room-code">6 位房间号</label><div class="join-row"><input id="room-code" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="例如 A2B3C4"/><button id="room-join" class="primary-button">加入</button></div><p id="online-error" class="online-error" role="status"></p><p class="modal-note">2–4 人实时对战。刷新会自动重连；每次操作限时 60 秒，超时由系统代走。</p></dialog><div id="online-toast" role="status" hidden></div>`);
+  document.body.insertAdjacentHTML('beforeend',`<dialog id="online-dialog"><button class="close" aria-label="关闭">×</button><div class="eyebrow">FLY TOGETHER, ANYWHERE</div><h2>和好友一起飞</h2><p>各用自己的手机，加入同一个房间。</p><label for="online-name">你的昵称</label><input id="online-name" maxlength="12" autocomplete="nickname" placeholder="输入昵称"/><label for="online-rules">新房间玩法</label><select id="online-rules"><option value="classic">经典模式</option><option value="skills">技能模式 · 10 种技能卡</option></select><button id="room-create" class="primary-button">创建好友房间</button><div class="online-or">或加入好友的房间</div><label for="room-code">6 位房间号</label><div class="join-row"><input id="room-code" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="例如 A2B3C4"/><button id="room-join" class="primary-button">加入</button></div><p id="online-error" class="online-error" role="status"></p><p class="modal-note">2–4 人实时对战。刷新会自动重连；每次操作限时 60 秒，超时由系统代走。</p></dialog><div id="online-toast" role="status" hidden></div>`);
+  const roomDialog=document.createElement('dialog');roomDialog.id='room-lobby-dialog';
+  roomDialog.innerHTML='<button class="close" aria-label="关闭房间">×</button><div class="eyebrow">FRIENDS LOBBY</div><h2>好友房间</h2>';
+  document.body.append(roomDialog);
+  roomDialog.querySelector('.close').onclick=()=>roomDialog.close();
+  roomDialog.addEventListener('close',()=>{$('.control-panel').before($('#room-card'));});
+  let roomDialogMatch=null;
+  function showRoom(){
+    if(!room)return;
+    roomDialogMatch=room.state?.matchId;draw();roomDialog.append($('#room-card'));
+    if(!roomDialog.open)roomDialog.showModal();
+  }
   $('#online-name').value=`飞行员${Math.floor(Math.random()*900+100)}`;
   function message(text){$('#online-error').textContent=text;$('#online-toast').textContent=text;$('#online-toast').hidden=!text;clearTimeout(message.timer);message.timer=setTimeout(()=>{$('#online-toast').hidden=true;},5000);}
   function request(event,data){return new Promise((resolve,reject)=>{
@@ -45,13 +56,18 @@ export function mountOnline({apply,reset,refresh}) {
     const closed=text=>{remember(null);room=null;memberId=null;reset();draw();message(text);};
     socket.on('closed',data=>closed(data.message));socket.on('replaced',()=>{clearTimeout(resumeTimer);socket.disconnect();socket=null;try{sessionStorage.removeItem('flight-room');}catch{}room=null;memberId=null;reset();draw();message('这个席位已在另一个页面登录');});
   }
+  let roomMarkupKey=null;
   function draw(){
     document.body.classList.toggle('online-playing',!!room?.state);
     const card=$('#room-card');card.hidden=!room;
     $('#room-create').disabled=pending;$('#room-join').disabled=pending;
-    if(!room)return;
+    if(!room){roomMarkupKey=null;if(roomDialog.open)roomDialog.close();return;}
+    if(roomDialog.open&&room.state&&room.state.phase!=='won'&&room.state.matchId!==roomDialogMatch)roomDialog.close();
     const host=room.host===memberId,waiting=!room.state,won=room.state?.phase==='won';
-    card.innerHTML=`<div class="players-title"><h3>${room.rules==='skills'?'技能':'经典'}房间 <b>${room.code}</b></h3><span class="net-status">${connected?'● 已连接':'○ 重连中'}</span></div><div class="room-members">${room.members.map(m=>`<div><i style="background:${['#e7473f','#f4c534','#3289dc','#22a361'][m.color]}"></i><span>${escapeHTML(m.name)}${m.id===memberId?'（你）':''}</span><small>${m.id===room.host?'房主 · ':''}${m.bot?'电脑接管':m.connected?'在线':'离线'}</small></div>`).join('')}</div><p class="room-hint">${waiting?'把链接或房间号发给好友，至少 2 人即可开始。':won?'航程结束，房主可以再开一局。':'离开后电脑代管；同一浏览器输入原房间号可接回，关闭页面后重新打开也可恢复。'}</p><div id="turn-clock"></div><div class="room-buttons"><button id="room-invite">邀请好友</button>${host&&(waiting||won)?`<button id="room-start" ${pending||!connected||room.members.length<2||room.members.some(m=>!m.bot&&!m.connected)?'disabled':''}>${won?'再开一局':'开始对局'}</button>`:''}<button id="room-leave">离开</button></div><div id="invite-details" hidden><input id="invite-link" readonly aria-label="好友邀请链接"/><canvas id="invite-qr" aria-label="扫码加入房间"></canvas><button id="copy-invite">复制邀请链接</button></div>`;
+    const key=JSON.stringify([room.code,room.rules,room.members,host,waiting,won,pending,connected]);
+    if(key===roomMarkupKey){tick();return;}
+    roomMarkupKey=key;
+    card.innerHTML=`<div class="players-title"><h3>${room.rules==='skills'?'技能':'经典'}房间 <b>${room.code}</b></h3><span class="net-status">${connected?'● 已连接':'○ 重连中'}</span></div><div class="room-members">${room.members.map(m=>`<div><i style="background:${['#e7473f','#f4c534','#3289dc','#22a361'][m.color]}"></i><span>${escapeHTML(m.name)}${m.id===memberId?'（你）':''}</span><small>${m.id===room.host?'房主 · ':''}${m.bot?'电脑接管':m.connected?'在线':'离线'}</small></div>`).join('')}</div><p class="room-hint">${waiting?'把链接或房间号发给好友，至少 2 人即可开始。':won?(host?'成员都在原房间，点击「再开一局」继续。':'已回到房间，等待房主开始下一局。'):'离开后电脑代管；同一浏览器输入原房间号可接回，关闭页面后重新打开也可恢复。'}</p><div id="turn-clock"></div><div class="room-buttons"><button id="room-invite">邀请好友</button>${host&&(waiting||won)?`<button id="room-start" ${pending||!connected||room.members.length<2||room.members.some(m=>!m.bot&&!m.connected)?'disabled':''}>${won?'再开一局':'开始对局'}</button>`:''}<button id="room-leave">离开</button></div><div id="invite-details" hidden><input id="invite-link" readonly aria-label="好友邀请链接"/><canvas id="invite-qr" aria-label="扫码加入房间"></canvas><button id="copy-invite">复制邀请链接</button></div>`;
     $('#room-start')?.addEventListener('click',()=>command('start'));
     $('#room-leave').addEventListener('click',async()=>{
       if(!leaving){leaving=true;$('#room-leave').textContent=room.state?'确认暂离，电脑代管（可重连）':'确认离开';return;}
@@ -81,11 +97,11 @@ export function mountOnline({apply,reset,refresh}) {
       document.querySelectorAll('dialog[open]').forEach(d=>d.close());update(result.room);message('已进入房间，邀请好友一起玩吧');
     }catch(e){message(e.message);}finally{pending=false;draw();refresh();}
   }
-  $('#online-open').addEventListener('click',()=>{if(room){$('#room-card').scrollIntoView({behavior:'smooth',block:'center'});return;}$('#online-dialog').showModal();connect();});
+  $('#online-open').addEventListener('click',()=>{if(room){showRoom();return;}$('#online-dialog').showModal();connect();});
   $('#online-dialog .close').addEventListener('click',()=>$('#online-dialog').close());
   $('#room-create').addEventListener('click',()=>enter('create'));$('#room-join').addEventListener('click',()=>enter('join'));
   $('#room-code').addEventListener('input',e=>{e.target.value=e.target.value.toUpperCase().replace(/[^0-9A-F]/g,'');});
-  const api={get room(){return room;},get memberId(){return memberId;},get connected(){return connected;},canPlay(){return !!room?.state&&connected&&!pending&&room.members[room.state.current]?.id===memberId;},command,decorate(){
+  const api={get room(){return room;},get memberId(){return memberId;},get connected(){return connected;},canPlay(){return !!room?.state&&connected&&!pending&&room.members[room.state.current]?.id===memberId;},command,showRoom,decorate(){
     if(!room)return;
     $('#new-game').disabled=true;$('#new-game').textContent='联网对局中 · 离开房间后可单机';
     $('.local-badge').textContent=connected?'● 好友联机':'○ 正在重连';

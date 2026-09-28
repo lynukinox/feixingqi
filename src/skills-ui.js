@@ -1,7 +1,8 @@
-import {CARDS,cardOptions,RING} from './engine.js';
+import {CARDS,cardOptions,RING,moveMultiplier,tripleLayers} from './engine.js';
 import {escapeHTML} from './online.js';
 import './skills.css';
 import {createBoardPicker} from './board-picker.js';
+import {cardArt,cardFace} from './card-art.js';
 
 export function mountSkills({getState,getOnline,isBusy,play,discard}) {
   const panel=document.createElement('section');panel.id='skills-panel';panel.className='skills-panel';
@@ -9,6 +10,8 @@ export function mountSkills({getState,getOnline,isBusy,play,discard}) {
   const dialog=document.createElement('dialog');dialog.id='card-dialog';
   dialog.innerHTML='<button class="close" aria-label="取消出牌">×</button><div class="eyebrow">FLIGHT SKILL</div><h2></h2><p class="card-description"></p><form><div id="missile-source-field" hidden><label for="missile-source">第一步：选择自己的发射飞机</label><select id="missile-source"></select></div><label for="card-target">选择目标</label><select id="card-target"></select><div id="barrier-map"></div><p class="modal-note">确认后消耗此卡，掷骰前还可继续使用其他卡。</p><button class="primary-button" type="submit">确认使用</button></form>';
   document.body.append(dialog);
+  const preview=document.createElement('div');preview.className='card-preview';
+  dialog.querySelector('h2').before(preview);
   const picker=createBoardPicker();
   const boardButton=document.createElement('button');boardButton.id='pick-on-board';boardButton.type='button';boardButton.className='secondary-button';boardButton.textContent='在棋盘上选择目标';dialog.querySelector('form').prepend(boardButton);
   let selection=null,lastKey='';
@@ -35,11 +38,12 @@ export function mountSkills({getState,getOnline,isBusy,play,discard}) {
       }});dialog.close();
     };
     dialog.querySelector('h2').textContent=CARDS[kind].name;
+    dialog.dataset.kind=kind;preview.innerHTML=cardArt(kind);
     dialog.querySelector('.card-description').textContent=CARDS[kind].description;
     sourceField.hidden=true;confirm.disabled=false;target.disabled=false;
     dialog.querySelector('label[for=card-target]').textContent=kind==='missile'?'选择发射飞机（将命中列出的所有飞机）':kind==='dice'?'选择飞机和额外步数':'选择目标';
     target.innerHTML=options.map((o,i)=>`<option value="${i}">${escapeHTML(o.label)}</option>`).join('');
-    map.innerHTML=kind==='barrier'?`<p>点击小棋盘选格，也可用上方列表选择。</p><svg viewBox="0 0 950 950" role="group" aria-label="选择路障位置"><image href="/board.svg" width="950" height="950"/>${options.map((o,i)=>{const [x,y]=RING[o.args.cell];return `<g data-option="${i}" role="button" tabindex="0" aria-label="${o.label}"><circle cx="${x}" cy="${y}" r="24"/><text x="${x}" y="${y+7}" text-anchor="middle">${o.args.cell+1}</text></g>`;}).join('')}</svg>`:'';
+    map.innerHTML=kind==='barrier'?`<p>点击小棋盘选格，也可用上方列表选择。</p><svg viewBox="0 0 950 950" role="group" aria-label="选择城墙位置"><image href="/board.svg" width="950" height="950"/>${options.map((o,i)=>{const [x,y]=RING[o.args.cell];return `<g data-option="${i}" role="button" tabindex="0" aria-label="${o.label}"><circle cx="${x}" cy="${y}" r="24"/><text x="${x}" y="${y+7}" text-anchor="middle">${o.args.cell+1}</text></g>`;}).join('')}</svg>`:'';
     map.querySelectorAll('[data-option]').forEach(g=>{
       const choose=()=>{target.value=g.dataset.option;mark();};g.onclick=choose;
       g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}};
@@ -57,14 +61,14 @@ export function mountSkills({getState,getOnline,isBusy,play,discard}) {
     const hidden=!room&&owner.ai;
     if(owner.pendingCards?.length&&!hidden){
       const choices=[...owner.hand,owner.pendingCards[0]];
-      panel.innerHTML=`<div class="players-title"><h3>${escapeHTML(owner.name)} · 选择弃牌</h3><span>${owner.hand.length} / 5</span></div><p class="skill-hint">手牌已满，还有 ${owner.pendingCards.length} 张新卡待选择。点击弃掉一张旧牌换入新卡，或放弃新卡。</p><div class="skill-hand">${[choices.length-1,...choices.slice(0,-1).map((_,i)=>i)].map(index=>{const kind=choices[index];return `<button class="skill-card" type="button" data-discard="${index}" ${isBusy()?'disabled':''}><span>${CARDS[kind]?.icon||'?'}</span><strong>${CARDS[kind]?.name||'技能卡'}</strong><small>${index===owner.hand.length?'新获得 · 放弃此卡':'弃掉此卡，换入新卡'}</small></button>`;}).join('')}</div>`;
+      panel.innerHTML=`<div class="players-title"><h3>${escapeHTML(owner.name)} · 选择弃牌</h3><span>${owner.hand.length} / 5</span></div><p class="skill-hint">手牌已满，还有 ${owner.pendingCards.length} 张新卡待选择。点击弃掉一张旧牌换入新卡，或放弃新卡。</p><div class="skill-hand">${[choices.length-1,...choices.slice(0,-1).map((_,i)=>i)].map(index=>{const kind=choices[index];return `<button class="skill-card" type="button" data-kind="${kind}" data-discard="${index}" ${isBusy()?'disabled':''}>${cardFace(kind,CARDS[kind]?.name||'技能卡',index===owner.hand.length?'新获得 · 放弃此卡':'弃掉此卡，换入新卡')}</button>`;}).join('')}</div>`;
       panel.querySelectorAll('[data-discard]').forEach(b=>b.onclick=()=>discard(owner.id,Number(b.dataset.discard)));
       return;
     }
     const hint=state.phase==='won'?'本局已结束':canPlay?'掷骰前可连续出牌，也可直接掷骰':'等待自己的掷骰阶段出牌';
-    panel.innerHTML=`<div class="players-title"><h3>${room?'我的':escapeHTML(owner.name)+'的'}技能卡</h3><span>${owner.hand.length} / 5</span></div><p class="skill-hint">${hint}${owner.triple?' · 三倍推进已就绪，下一次移动 ×3':''}</p><div class="skill-hand">${owner.hand.map((kind,index)=>{
+    panel.innerHTML=`<div class="players-title"><h3>${room?'我的':escapeHTML(owner.name)+'的'}技能卡</h3><span>${owner.hand.length} / 5</span></div><p class="skill-hint">${hint}${owner.triple?' · 强行顶 '+tripleLayers(owner)+'/2 层，下一次移动 ×'+moveMultiplier(owner):''}</p><div class="skill-hand">${owner.hand.map((kind,index)=>{
       const card=hidden?null:CARDS[kind],enabled=canPlay&&cardOptions(state,index).length>0;
-      return `<button type="button" class="skill-card" data-kind="${kind||'hidden'}" data-card="${index}" ${enabled?'':'disabled'} title="${card?escapeHTML(card.description):'对手的手牌'}"><span>${card?.icon||'?'}</span><strong>${card?.name||'隐藏手牌'}</strong><small>${enabled?'点击使用':canPlay?'暂无有效目标':'等待使用'}</small></button>`;
+      return `<button type="button" class="skill-card" data-kind="${card?kind:'hidden'}" data-card="${index}" ${enabled?'':'disabled'} title="${card?escapeHTML(card.description):'对手的手牌'}">${cardFace(card?kind:'hidden',card?.name||'隐藏手牌',enabled?'点击使用 ↗':canPlay?'暂无有效目标':'等待使用')}</button>`;
     }).join('')||'<p class="skill-empty">暂无手牌，归航或被撞毁可补卡。</p>'}</div><p class="skill-round">第 ${state.round} 轮 · 再完成 ${5-(state.round-1)%5} 轮补卡</p>`;
     if(canPlay&&owner.hand.length){
       const button=document.createElement('button');button.className='secondary-button';button.textContent='主动弃牌';

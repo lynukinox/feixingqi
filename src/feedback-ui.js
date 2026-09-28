@@ -17,7 +17,8 @@ export function mountFeedback(){
       }).join('');clearTimeout(timer);timer=setTimeout(()=>notices.replaceChildren(),6500);
     }
     if(state.phase==='won'){
-      results.innerHTML='<p>本局排名 · 按归航数、航程进度排序</p><table><thead><tr><th>玩家</th><th>归航</th><th>击毁</th><th>用卡</th></tr></thead><tbody>'+standings(state).map((p,i)=>`<tr><th><span>${i+1}</span> ${escapeHTML(p.name)}</th><td>${p.arrived}/4</td><td>${p.captures||0}</td><td>${p.cardsUsed||0}</td></tr>`).join('')+'</tbody></table>';
+      const markup='<p>本局排名 · 按归航数、航程进度排序</p><table><thead><tr><th>玩家</th><th>归航</th><th>击毁</th><th>用卡</th></tr></thead><tbody>'+standings(state).map((p,i)=>`<tr><th><span>${i+1}</span> ${escapeHTML(p.name)}</th><td>${p.arrived}/4</td><td>${p.captures||0}</td><td>${p.cardsUsed||0}</td></tr>`).join('')+'</tbody></table>';
+      if(results.innerHTML!==markup)results.innerHTML=markup;
     }
   }
   function reset(){lastSeq=0;lastRound=1;clearTimeout(timer);notices.replaceChildren();results.replaceChildren();}

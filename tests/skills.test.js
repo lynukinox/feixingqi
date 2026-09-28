@@ -28,8 +28,8 @@ test('five complete rounds, not five turns or bonus rolls, award all players',()
 test('arrival and each destroyed plane grant cards, shields prevent destruction and reward',()=>{
   const s=game();s.players[0].pieces[0]=55;roll(s,1);move(s,0,fixed);assert.equal(s.players[0].hand.length,3);
   const t=game();t.players[0].pieces[0]=13;t.players[1].pieces=[2,2,-1,-1];t.players[1].shields[0]=true;
-  roll(t,2);const result=move(t,0,fixed);assert.equal(result.blocked.length,1);assert.equal(result.captured.length,1);
-  assert.deepEqual(t.players[1].pieces,[2,-1,-1,-1]);assert.equal(t.players[1].hand.length,3);assert.equal(t.players[1].shields[0],false);
+  roll(t,2);const result=move(t,0,fixed);assert.equal(result.blocked.length,1);assert.equal(result.captured.length,0);assert.equal(result.target,14);
+  assert.deepEqual(t.players[1].pieces,[2,2,-1,-1]);assert.equal(t.players[1].hand.length,2);assert.equal(t.players[1].shields[0],false);
 });
 test('barrier destroys on contact, consumes itself and cancels jumps; jump over a barrier is safe',()=>{
   const s=game();give(s,'barrier');s.players[0].pieces[0]=3;

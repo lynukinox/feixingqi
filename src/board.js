@@ -55,10 +55,19 @@ export class Board extends Phaser.Scene {
   }
   sync(state,controllableId=null) {
     this.pending=state;this.controllableId=controllableId;if(!this.ready)return;
+    const legal=legalPieces(state),current=state.players[state.current];
+    const activePlayer=!current.ai&&(controllableId===null||current.id===controllableId)&&legal.length?current.id:null;
+    const visualKey=JSON.stringify([state.rules,state.barriers,state.players.map(p=>[p.id,p.pieces,p.shields]),activePlayer,activePlayer===null?[]:legal]);
+    if(this.visualKey===visualKey)return;
+    this.visualKey=visualKey;
     this.tokens.forEach(t=>{this.tweens.killTweensOf(t);t.destroy();});this.tokens=[];
     this.skillMarkers.forEach(m=>m.destroy());this.skillMarkers=[];
+    if(this.numberedRules!==state.rules){
+      this.cellLabels?.forEach(label=>label.destroy());
+      this.cellLabels=state.rules==='skills'?RING.map(([x,y],i)=>this.label(x,y+16,String(i+1),10,'#425845').setDepth(2)):[];
+      this.numberedRules=state.rules;
+    }
     if(state.rules==='skills'){
-      RING.forEach(([x,y],i)=>this.skillMarkers.push(this.label(x,y+16,String(i+1),10,'#425845').setDepth(2)));
       for(const cell of state.barriers){
         const [x,y]=RING[cell],barrier=this.add.container(x,y).setDepth(9),g=this.add.graphics();
         g.fillStyle(0x42200d,.25).fillEllipse(0,20,48,12);
@@ -73,7 +82,6 @@ export class Board extends Phaser.Scene {
         barrier.add(g);this.skillMarkers.push(barrier);
       }
     }
-    const legal=legalPieces(state),current=state.players[state.current];
     state.players.forEach(player=>player.pieces.forEach((p,i)=>{
       const arrived=p===FINISH;
       const point=xy(position(player,arrived?-1:p,i));
@@ -122,11 +130,12 @@ export class Board extends Phaser.Scene {
       }else if(e.kind==='missile'||e.kind==='recycle'){
         const [sx,sy]=e.from,projectile=this.label(sx,sy,e.kind==='missile'?'➤':'✈',38,e.kind==='missile'?'#dd673d':'#6384a5').setDepth(65);
         projectile.setRotation(Math.atan2(y-sy,x-sx));
-        this.tweens.add({targets:projectile,x,y,duration:500,ease:'Sine.easeIn',onComplete:()=>{projectile.destroy();burst(e.kind==='recycle'?'回收 +2':e.blocked?'护盾抵挡':'命中！',e.blocked?'#368fa9':'#d96a38');}});
-      }else burst(({blocked:'护盾破裂',shield:'护盾已展开',barrier:'路障',crash:'撞毁！',double:'全机起飞'})[e.kind]||'技能生效',e.kind==='blocked'||e.kind==='shield'?'#368fa9':'#d58a38');
+        this.tweens.add({targets:projectile,x,y,duration:500,ease:'Sine.easeIn',onComplete:()=>{projectile.destroy();burst(e.kind==='recycle'?'他就堵了 +2':e.blocked?'护盾抵挡':'命中！',e.blocked?'#368fa9':'#d96a38');}});
+      }else burst(({blocked:'护盾破裂',shield:'护盾已展开',barrier:'城墙',crash:'撞毁！',double:'一起起飞'})[e.kind]||'技能生效',e.kind==='blocked'||e.kind==='shield'?'#368fa9':'#d58a38');
     }
   }
   async animate(player,piece,route) {
+    this.visualKey=null;
     const token=this.tokens.find(t=>t.getData('player')===player.id&&t.getData('piece')===piece);if(!token)return;
     this.tweens.killTweensOf(token);token.setScale(1).setDepth(30);
     if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;

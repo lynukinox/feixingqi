@@ -40,7 +40,7 @@ export function createBoardPicker(){
       },`选择自己的${o.args.piece+1}号发射飞机`);
     }
     else{
-      overlay.replaceChildren();heading(kind==='barrier'?'点击高亮空格放置路障':'点击高亮的己方飞机');
+      overlay.replaceChildren();heading(kind==='barrier'?'点击高亮空格放置城墙':'点击高亮的己方飞机');
       for(const o of options){
         const cell=o.args.cell,piece=o.args.piece;
         marker(cell!==undefined?RING[cell]:point(actor,piece),String((cell??piece)+1),cell!==undefined?'#c87531':COLORS[actor.id],()=>choose(o.args),o.label);

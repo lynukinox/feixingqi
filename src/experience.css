@@ -37,3 +37,5 @@
 
 /* The board is embedded in a scrolling page, not a full-screen gesture surface. */
 #board canvas,#board-targets{touch-action:pan-y pinch-zoom!important}
+
+#room-lobby-dialog{width:min(520px,calc(100vw - 28px));max-height:90dvh;overflow:auto}#room-lobby-dialog .room-card{margin:14px 0 0;box-shadow:none}#room-lobby-dialog .room-buttons{display:flex;flex-wrap:wrap;gap:8px}
