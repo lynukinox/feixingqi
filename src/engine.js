@@ -232,6 +232,10 @@ export function planMove(state,player,progress,die) {
   }
   return result;
 }
+function crossesHomePlane(player,route,enemy,progress){
+  // The 18 -> 30 flight crosses the opposite colour's third home-lane cell.
+  return enemy.id===(player.id+2)%4&&progress===53&&route.some((p,i)=>p===18&&route[i+1]===30);
+}
 export function move(state, piece, rng=randomIndex) {
   if (!legalPieces(state).includes(piece)) return null;
   const player = state.players[state.current];
@@ -246,7 +250,16 @@ export function move(state, piece, rng=randomIndex) {
   result.blocked = [];
   result.effects = [];
   const protectedPieces=new Set();
-  // Only landing squares collide. Ordinary transit and flight crossings are safe.
+  function strike(enemy,i){
+    const key=`${enemy.id}:${i}`;
+    if(protectedPieces.has(key))return;
+    const at=position(enemy,enemy.pieces[i],i);
+    if(!hit(state,enemy,i,rng)){
+      protectedPieces.add(key);result.blocked.push({player:enemy.id,piece:i});result.effects.push({kind:'blocked',at});return;
+    }
+    player.stats.captures++;result.captured.push({player:enemy.id,piece:i});
+  }
+  // Ordinary transit is safe; flight crossings additionally hit the intersected home cell.
   const landing = result.route.slice(Math.min(steps, result.route.length) - 1);
   for (const p of new Set(landing)) {
     if (p === 0 || p > 50 || (result.barrier!==undefined&&globalIndex(player,p)===result.barrier)) continue;
@@ -254,14 +267,14 @@ export function move(state, piece, rng=randomIndex) {
       if (enemy.id === player.id) continue;
       enemy.pieces.forEach((enemyP, i) => {
         if (enemyP > 0 && enemyP <= 50 && globalIndex(enemy, enemyP) === globalIndex(player, p)) {
-          const key=`${enemy.id}:${i}`;
-          if(protectedPieces.has(key))return;
-          if(enemy.shields?.[i]){enemy.shields[i]=false;protectedPieces.add(key);result.blocked.push({player:enemy.id,piece:i});result.effects.push({kind:'blocked',at:position(enemy,enemyP,i)});return;}
-          hit(state,enemy,i,rng);player.stats.captures++;
-          result.captured.push({ player: enemy.id, piece: i });
+          strike(enemy,i);
         }
       });
     }
+  }
+  for(const enemy of state.players){
+    if(enemy.id===player.id)continue;
+    enemy.pieces.forEach((p,i)=>{if(crossesHomePlane(player,result.route,enemy,p))strike(enemy,i);});
   }
   player.pieces[piece] = result.target;
   if(result.target===FINISH){player.shields[piece]=false;drawCards(state,player,1,rng,'归航奖励');}
@@ -308,7 +321,7 @@ function positionValue(state,id){
         if(p<0||p===FINISH)continue;
         const steps=die*(enemy.triple?3:1),route=planMove(state,enemy,p,steps);
         const landings=new Set(route.route.slice(Math.min(steps,route.route.length)-1).filter(v=>onRing(v)&&(route.barrier===undefined||globalIndex(enemy,v)!==route.barrier)).map(v=>globalIndex(enemy,v)));
-        const loss=own.pieces.reduce((sum,v,i)=>sum+(onRing(v)&&landings.has(globalIndex(own,v))?(own.shields[i]?10:planeValue(v)-(state.rules==='skills'&&own.hand.length<5?7:0)):0),0);
+        const loss=own.pieces.reduce((sum,v,i)=>sum+((onRing(v)&&landings.has(globalIndex(own,v))||crossesHomePlane(enemy,route.route,own,v))?(own.shields[i]?10:planeValue(v)-(state.rules==='skills'&&own.hand.length<5?7:0)):0),0);
         worst=Math.max(worst,loss);
       }
       expected+=worst/6;
