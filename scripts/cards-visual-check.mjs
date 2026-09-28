@@ -21,6 +21,11 @@ try{
  await a.setViewportSize({width:390,height:844});await a.locator('#skills-panel').scrollIntoViewIfNeeded();
  await a.locator('#skills-panel').screenshot({path:'artifacts/cards-mobile.png'});
  assert.equal(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ const cardBox=await a.locator('.skill-card').first().boundingBox();
+ assert.ok(cardBox.width>=44&&cardBox.width<=100&&cardBox.height<=134,'Phone cards should remain compact and tappable');
+ await a.setViewportSize({width:320,height:740});
+ assert.equal(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await a.setViewportSize({width:390,height:844});
  await a.locator('[data-card="2"]').click();await expect(a.locator('#card-dialog')).toBeVisible();
  await expect(a.locator('#card-dialog h2')).toHaveText('强行顶');await a.locator('#card-dialog').screenshot({path:'artifacts/card-dialog.png'});
  await a.locator('#card-dialog [type=submit]').click();await expect(a.locator('.skill-card')).toHaveCount(4);assert.equal(room.state.players[0].triple,1);
