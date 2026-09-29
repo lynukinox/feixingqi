@@ -1,4 +1,4 @@
-import {position,RING,globalIndex,COLORS,missileTargets} from './engine.js';
+import {position,RING,COLORS,missileTargets,missileRange} from './engine.js';
 
 export function createBoardPicker(){
   const board=document.querySelector('#board'),overlay=document.createElement('div'),hint=document.createElement('div');
@@ -27,10 +27,9 @@ export function createBoardPicker(){
       heading('选择发射飞机，再确认范围内所有目标（包括友机）');
       for(const o of options)marker(point(actor,o.args.piece),String(o.args.piece+1),COLORS[actor.id],()=>{
         overlay.replaceChildren();
-        heading('前后 3 格范围：点击发射飞机确认，红圈内友机也会受伤');
-        const center=globalIndex(actor,actor.pieces[o.args.piece]);
-        for(let d=-3;d<=3;d++){
-          const [x,y]=RING[(center+d+52)%52],dot=document.createElement('i');dot.className='range-cell';dot.style.left=`${x/9.5}%`;dot.style.top=`${y/9.5}%`;overlay.append(dot);
+        heading('沿航道 3 格，含最终航道：点击发射飞机确认，友机也会受伤');
+        for(const cell of missileRange(state,actor,o.args.piece)){
+          const [x,y]=cell.at,dot=document.createElement('i');dot.className='range-cell';dot.style.left=`${x/9.5}%`;dot.style.top=`${y/9.5}%`;overlay.append(dot);
         }
         for(const t of missileTargets(state,actor,o.args.piece)){
           const p=state.players.find(p=>p.id===t.player),[x,y]=point(p,t.piece),dot=document.createElement('i');

@@ -19,11 +19,13 @@ test('fixed movement is immediate, atomic, and leaves the ordinary roll availabl
   s.players[0].hand=['double'];assert.ok(useCard(s,0,{}));roll(s,1);assert.equal(s.die,1);
   assert.equal(useCard(s,0,{}),null);move(s,0);endTurn(s);assert.equal(s.current,1);
 });
-test('five complete rounds, not five turns or bonus rolls, award all players',()=>{
+test('four complete rounds, not four turns or bonus rolls, award all players',()=>{
   const s=game();
-  for(let i=0;i<19;i++){roll(s,1);endTurn(s,fixed);}
-  assert.equal(s.round,5);assert.equal(s.players[0].hand.length,2);
-  roll(s,1);endTurn(s,fixed);assert.equal(s.round,6);assert.ok(s.players.every(p=>p.hand.length===3));
+  for(let i=0;i<15;i++){roll(s,1);endTurn(s,fixed);}
+  assert.equal(s.round,4);assert.ok(s.players.every(p=>p.hand.length===2));
+  roll(s,6);move(s,0,fixed);endTurn(s,fixed);
+  assert.equal(s.round,4);assert.ok(s.players.every(p=>p.hand.length===2));
+  roll(s,1);move(s,0,fixed);endTurn(s,fixed);assert.equal(s.round,5);assert.ok(s.players.every(p=>p.hand.length===3));
 });
 test('arrival and each destroyed plane grant cards, shields prevent destruction and reward',()=>{
   const s=game();s.players[0].pieces[0]=55;roll(s,1);move(s,0,fixed);assert.equal(s.players[0].hand.length,3);

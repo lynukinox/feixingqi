@@ -1,6 +1,7 @@
 // Small vector illustrations stay crisp on phones without loading image assets.
 const plane='<path d="M0-19 5-5 19 3v5L5 4v9l6 5v3L0 18l-11 3v-3l6-5V4l-14 4V3L-5-5Z" fill="var(--card-accent)"/><path d="M0-14V13" stroke="#fff" opacity=".65"/>';
 const artwork={
+  cruise:'<path d="M19 32h19M14 44h18M22 57h15" stroke-width="3" opacity=".5"/><g transform="translate(59 38) rotate(90) scale(.8)">'+plane+'</g><text x="62" y="76" text-anchor="middle" fill="var(--card-accent)" stroke="none" font-family="Arial,sans-serif" font-size="21" font-weight="700">×2</text>',
   dice:'<path d="m39 22 27 6 10 25-23 18-26-17Z" fill="var(--card-accent)" opacity=".14"/><rect x="31" y="24" width="42" height="42" rx="10" fill="#fffaf0" transform="rotate(-12 52 45)"/><g fill="var(--card-accent)" stroke="none"><circle cx="40" cy="36" r="3"/><circle cx="61" cy="32" r="3"/><circle cx="51" cy="45" r="3"/><circle cx="43" cy="58" r="3"/><circle cx="64" cy="54" r="3"/></g><path d="m77 20 3 5 6 1-5 4-1 6-4-5-6-1 5-4Z" fill="#e8bb65" stroke="none"/>',
   barrier:'<path d="M25 69V30h10v9h11V27h12v12h11v-9h10v39Z" fill="#f4dec5"/><path d="M25 49h54M25 60h54M40 39v10m20 0v11m-20 0v9M58 39v10" opacity=".55"/><path d="M45 69V57a7 7 0 0 1 14 0v12" fill="var(--card-accent)"/><path d="M23 72h58"/>',
   missile:'<path d="m57 18 5 13 14-4-4 14 14 5-13 8 7 13-17-1-5 14-9-13-15 5 3-15-14-7 14-8-4-14 15 4Z" fill="#f3dbac" stroke="none"/><g transform="translate(52 44) rotate(40)"><path d="M-9 10V-7Q-8-20 0-24 8-20 9-7v17Z" fill="#fff8f0"/><circle cy="-7" r="4" fill="var(--card-accent)"/><path d="m-9 2-8 12 8-2m18-10 8 12-8-2" fill="var(--card-accent)"/><path d="m-5 14 5 13 5-13" fill="#e6a459"/></g>',
@@ -18,6 +19,6 @@ export function cardArt(kind){
   return `<svg viewBox="0 0 104 88" fill="none" stroke="var(--card-accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="52" cy="75" rx="30" ry="4" fill="var(--card-accent)" stroke="none" opacity=".08"/><circle cx="52" cy="44" r="33" stroke-dasharray="2 5" opacity=".16"/><path d="M15 25h6m-3-3v6M84 63h6m-3-3v6" opacity=".45"/>${artwork[kind]||artwork.hidden}</svg>`;
 }
 export function cardFace(kind,name,status){
-  const [category,detail]=metadata[kind]||metadata.hidden;
+  const [category,detail]=kind==='cruise'?['增益','单机持续 ×2']:metadata[kind]||metadata.hidden;
   return `<span class="card-topline"><span>${category}</span><span aria-hidden="true">✦</span></span><span class="card-illustration">${cardArt(kind)}</span><strong>${name}</strong><span class="card-detail">${detail}</span><small class="card-action">${status}</small>`;
 }

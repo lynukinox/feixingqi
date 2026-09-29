@@ -10,6 +10,7 @@
 .skill-card[data-kind=triple],#card-dialog[data-kind=triple]{--card-accent:#aa7d35;--card-wash:#fff3d9}
 .skill-card[data-kind=retreat],#card-dialog[data-kind=retreat]{--card-accent:#6f79aa;--card-wash:#f0f0fc}
 [data-kind=steal]{--card-accent:#89705b;--card-wash:#f6f0e9}
+.skill-card[data-kind=cruise],#card-dialog[data-kind=cruise]{--card-accent:#427f87;--card-wash:#e9f5f2}
 .skill-hand{gap:12px;padding:3px 2px 10px}
 .skill-card{isolation:isolate;align-items:center;min-height:164px;padding:10px 10px 8px;gap:0;border-radius:15px;border-color:color-mix(in srgb,var(--card-accent) 28%,#fff);background:radial-gradient(ellipse at 50% 15%,#ffffffd9,transparent 65%),linear-gradient(155deg,#fffdf8,var(--card-wash));box-shadow:0 3px 0 #fff,0 4px 0 color-mix(in srgb,var(--card-accent) 25%,#e3e6e6),0 7px 13px #243a4b0b;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;touch-action:pan-x pan-y}
 .skill-card:before{content:'';position:absolute;inset:5px;border:1px solid color-mix(in srgb,var(--card-accent) 15%,transparent);border-radius:10px;pointer-events:none}

@@ -1,4 +1,5 @@
 #board{position:relative}
+.team-summary{display:flex;gap:8px;margin:8px 20px;padding:10px 12px;background:#f3f6f8;border:1px solid #dce4eb;border-radius:12px;font-size:12px}.team-summary[hidden]{display:none}.team-summary>div{flex:1;min-width:0}.team-summary b{display:block;color:#395777;margin-bottom:4px}.team-summary>div+div{border-left:1px solid #dce4eb;padding-left:10px}.team-summary span{display:block;color:#6b7b87;line-height:1.5;overflow-wrap:anywhere}@media(max-width:760px){.team-summary{margin:6px 12px;font-size:10px}}
 #board-targets{position:absolute;inset:0;z-index:70;background:#15334a22}
 .target-plane,.range-cell{position:absolute;transform:translate(-50%,-50%);border-radius:50%}
 .target-plane{width:5.5%;aspect-ratio:1;min-width:23px;padding:0;border:3px solid white;background:var(--target-color);color:white;box-shadow:0 0 0 3px var(--target-color),0 3px 9px #0005;font-weight:800;font-size:clamp(11px,1.4vw,18px);z-index:2;cursor:pointer}

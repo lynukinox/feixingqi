@@ -1,0 +1,6 @@
+#card-playback{position:absolute;inset:0;z-index:68;pointer-events:none;overflow:hidden;container-type:inline-size;border-radius:inherit}
+:where(.airport-card){--card-accent:#547397;--card-wash:#f0f5fa}
+.airport-card{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;width:27%;max-width:210px;box-sizing:border-box;padding:7px 9px;border:1px solid color-mix(in srgb,var(--card-accent) 45%,white);border-radius:12px;background:linear-gradient(135deg,#fffef9f5,var(--card-wash));box-shadow:0 4px 14px #233c5325,inset 0 0 0 3px #ffffffb0;color:#304961;pointer-events:none}
+.airport-card-art{width:34%;flex-shrink:0;display:block}.airport-card-art svg{display:block;width:100%;height:auto}
+.airport-card>span:last-child{min-width:0;display:flex;flex-direction:column;gap:3px}.airport-card small{font-size:clamp(8px,1.4cqw,11px);color:var(--card-accent);white-space:nowrap}.airport-card strong{font-size:clamp(10px,1.9cqw,16px);line-height:1.4;white-space:nowrap;letter-spacing:.2px}
+@media(max-width:760px){.airport-card{padding:4px 5px;gap:2px;border-radius:8px}.airport-card>span:last-child{gap:1px}}

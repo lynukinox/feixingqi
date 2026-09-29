@@ -31,5 +31,11 @@ try{
  await a.locator('#card-dialog [type=submit]').click();await expect(a.locator('.skill-card')).toHaveCount(4);assert.equal(room.state.players[0].triple,1);
  room.state.players[0].hand=sets[0];room.state.players[0].pendingCards=['triple'];await a.reload();
  await expect(a.locator('[data-discard] svg')).toHaveCount(6);await a.locator('[data-discard="5"]').click();await expect(a.locator('[data-discard]')).toHaveCount(0);
- assert.deepEqual(errors,[]);console.log('PASS: ten card faces, desktop/mobile layout, card confirmation and overflow discard.');
+ room.state.players[0].hand=['cruise'];await a.reload();await expect(a.locator('[data-kind="cruise"].skill-card')).toBeVisible();
+ await a.locator('#skills-panel').screenshot({path:'artifacts/cruise-card.png'});
+ await a.locator('[data-card="0"]').click();await expect(a.locator('#card-dialog h2')).toHaveText('双倍巡航');
+ await a.locator('#card-dialog [type=submit]').click();await expect(a.locator('.skill-card')).toHaveCount(0);
+ assert.equal(room.state.players[0].cruise[0],true);await a.reload();await expect(a.locator('#roll')).toBeEnabled();
+ assert.equal(room.state.players[0].cruise[0],true);
+ assert.deepEqual(errors,[]);console.log('PASS: eleven card faces, desktop/mobile layout, cruise use and reconnect, confirmation and overflow discard.');
 }finally{await browser.close();await server.close();}

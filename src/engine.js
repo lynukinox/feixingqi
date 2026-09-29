@@ -1,6 +1,8 @@
 export const COLORS = ['#e7473f', '#f4c534', '#3289dc', '#22a361'];
 export const NAMES = ['红方', '黄方', '蓝方', '绿方'];
 export const FINISH = 56;
+export const allies=(state,a,b)=>a===b||!!state.teamMode&&a%2===b%2;
+export const teamName=id=>id%2===0?'红蓝队':'黄绿队';
 export function rotatePoint([x,y], turns) {
   for(let i=0;i<turns;i++) [x,y]=[950-y,x];
   return [Number(x.toFixed(2)),Number(y.toFixed(2))];
@@ -15,18 +17,20 @@ export const tileColor = index => (index+3)%4;
 export const CARDS = {
   dice: {name:'定点骰子',icon:'⚄',description:'选择一架飞机立即执行 1–6 点的额外移动；2、4、6 点可起飞，不消耗正常掷骰，6 点不额外连掷。'},
   barrier: {name:'城墙',icon:'⊥',description:'在公共航道空格放置城墙。经过或落在该格的第一架飞机立即撞毁回机场，城墙消失；护盾可抵挡一次并停在该格，跳飞跨过不触发。'},
-  missile: {name:'爆爆爆',icon:'➶',description:'选择己方公共航道飞机，击毁前后 3 格内所有其他飞机，包括友机和同格飞机；发射飞机不受影响，护盾可抵挡。'},
+  missile: {name:'爆爆爆',icon:'➶',description:'选择己方公共航道飞机，击毁沿航道 3 格内所有其他飞机，包括友机、同格飞机及范围内最终航道飞机；最终航道从入口向内计数。发射飞机和已到终点的飞机不受影响，护盾可抵挡。'},
   shield: {name:'护盾',icon:'◇',description:'保护一架已起飞的己方飞机，抵挡一次撞机、爆爆爆或城墙；抵挡撞机时敌机停在目标格前一格，不触发追加跳跃或撞机；每架最多一个。'},
   disrupt: {name:'过河拆桥',icon:'ϟ',description:'指定一名有手牌的对手，随机弃掉对方一张卡。'},
   recycle: {name:'他就堵了',icon:'↶',description:'撤回一架已起飞、未归航的己方飞机，抽两张卡；不算撞毁。'},
   double: {name:'一起起飞',icon:'⇈',description:'机场内所有飞机直接起飞，进入起飞区；随后照常出牌、掷骰。'},
   triple: {name:'强行顶',icon:'×3',description:'下一次实际移动的骰点步数乘 3，可配合定点骰子；最多叠加两张（×3、×9），移动一次消耗全部加成，起飞不消耗，跳跃距离不翻倍。仅正常掷出 6 点奖励连掷。'},
   retreat: {name:'退退退退',icon:'↤',description:'指定己方或敌方一架已进入航道、未归航的飞机倒退 4 格；可消耗自己的一层或两层强行顶变为 12 或 36 格。落点正常撞机，护盾与城墙生效；同色格反向跳跃、飞跃线反向飞行，最多退至起飞区，不占正常掷骰。'},
+  cruise: {name:'双倍巡航',icon:'×2',description:'指定一架尚未进入最终航道的己方飞机，持续获得双倍步数，可与强行顶相乘，也影响倒退。同一架不叠加，起飞及跳飞距离不变；被击毁后清除，主动回收保留。进入最终航道立即移除，剩余点数按一步结算，不再恢复。'},
   steal: {name:'顺手牵羊',icon:'⇄',description:'随机偷取一名对手的一张卡；先消耗此卡，再获得偷来的卡。'}
 };
 export const CARD_KEYS=Object.keys(CARDS);
 export const tripleLayers=player=>Math.min(2,Math.max(0,Number(player.triple)||0));
 export const moveMultiplier=player=>3**tripleLayers(player);
+const cruising=(player,piece)=>!!player.cruise?.[piece]&&player.pieces[piece]>=0&&player.pieces[piece]<=50;
 export function randomIndex(max) {
   const data=new Uint32Array(1),limit=Math.floor(4294967296/max)*max;
   do {crypto.getRandomValues(data);} while(data[0]>=limit);
@@ -67,28 +71,40 @@ export function autoDiscard(state,id){
     // A timeout keeps the existing hand; bots prefer flexible cards.
     let index=p.hand.length;
     if(p.ai){
-      const values={dice:9,shield:7,missile:7,steal:6,double:p.pieces.includes(-1)?6:0,recycle:3,barrier:4,disrupt:2,triple:8,retreat:6};
+      const values={dice:9,shield:7,missile:7,steal:6,double:p.pieces.includes(-1)?6:0,recycle:3,barrier:4,disrupt:2,triple:8,retreat:6,cruise:9};
       const choices=[...p.hand,p.pendingCards[0]];
       index=choices.reduce((best,c,i)=>(values[c]??0)<(values[choices[best]]??0)?i:best,choices.length-1);
     }
     discardCard(state,id,index);
   }
 }
-export function createState({ mode = 'ai', count = 4, rules = 'classic', rng=randomIndex } = {}) {
+export function createState({ mode = 'ai', count = 4, rules = 'classic',teamMode=false, rng=randomIndex } = {}) {
+  teamMode=rules==='skills2v2'||rules==='skills'&&teamMode;
+  if(teamMode){rules='skills';count=4;}
   const ids = count === 2 ? [0, 2] : count === 3 ? [0, 1, 2] : [0, 1, 2, 3];
-  const state={ matchId:crypto.randomUUID(), rules: rules === 'skills' ? 'skills' : 'classic', skillUsed:false, forcedDie:null, barriers:[], round:1,
-    players: ids.map((id,i)=>({id,name:mode==='ai'?(i===0?'你':`电脑 ${i}`):`玩家 ${i+1}`,ai:mode==='ai'&&i>0,pieces:[-1,-1,-1,-1],hand:[],pendingCards:[],triple:false,shields:[false,false,false,false],stats:{captures:0,destroyed:0,cardsUsed:0}})),
+  const state={ matchId:crypto.randomUUID(),teamMode, rules: rules === 'skills' ? 'skills' : 'classic', skillUsed:false, forcedDie:null, barriers:[], round:1,
+    players: ids.map((id,i)=>({id,name:mode==='ai'?(i===0?'你':`电脑 ${i}`):`玩家 ${i+1}`,ai:mode==='ai'&&i>0,pieces:[-1,-1,-1,-1],hand:[],pendingCards:[],triple:false,cruise:[false,false,false,false],shields:[false,false,false,false],stats:{captures:0,destroyed:0,cardsUsed:0}})),
     current:0,die:null,phase:'roll',winner:null,turn:1,moves:0 };
   state.players.forEach(p=>drawCards(state,p,2,rng,'开局发卡'));return state;
 }
 const onRing=p=>p>0&&p<=50;
-export function missileTargets(state,actor,piece){
+const ringDistance=(a,b)=>Math.min(Math.abs(a-b),52-Math.abs(a-b));
+export function missileRange(state,actor,piece){
   if(!Number.isInteger(piece)||!onRing(actor.pieces[piece]))return [];
-  const center=globalIndex(actor,actor.pieces[piece]),targets=[];
+  const center=globalIndex(actor,actor.pieces[piece]),cells=[];
+  for(let d=-3;d<=3;d++)cells.push({cell:(center+d+52)%52,at:RING[(center+d+52)%52]});
+  for(const player of state.players){
+    const toEntry=ringDistance(center,globalIndex(player,50));
+    for(let progress=51;progress<FINISH;progress++)if(toEntry+progress-50<=3)cells.push({player:player.id,progress,at:position(player,progress)});
+  }
+  return cells;
+}
+export function missileTargets(state,actor,piece){
+  const cells=missileRange(state,actor,piece),targets=[];
+  if(!cells.length)return targets;
   for(const player of state.players)player.pieces.forEach((v,i)=>{
-    if(!onRing(v)||(player.id===actor.id&&i===piece))return;
-    const distance=Math.abs(globalIndex(player,v)-center);
-    if(Math.min(distance,52-distance)<=3)targets.push({player:player.id,piece:i});
+    if(v<=0||v>=FINISH||(player.id===actor.id&&i===piece))return;
+    if(cells.some(c=>onRing(v)?c.cell===globalIndex(player,v):c.player===player.id&&c.progress===v))targets.push({player:player.id,piece:i});
   });
   return targets;
 }
@@ -97,10 +113,11 @@ export function cardOptions(state,index) {
   if(state.rules!=='skills'||state.phase!=='roll'||actor.pendingCards?.length||!Number.isInteger(index))return [];
   const kind=actor.hand[index],options=[];
   const add=(args,label)=>options.push({args,label});
+  if(kind==='cruise')actor.pieces.forEach((v,piece)=>{if(v<51&&!actor.cruise?.[piece])add({piece},`${piece+1} 号飞机 · 持续双倍步数`);});
   if(kind==='dice')actor.pieces.forEach((v,piece)=>{
-    for(let value=1;value<=6;value++)if(v<FINISH&&(v>=0||value%2===0))add({piece,value},`${piece+1} 号飞机 · ${v<0?'起飞':`前进 ${value*moveMultiplier(actor)} 格`}（${value} 点）`);
+    for(let value=1;value<=6;value++)if(v<FINISH&&(v>=0||value%2===0))add({piece,value},`${piece+1} 号飞机 · ${v<0?'起飞':`前进 ${previewMove(v,value*moveMultiplier(actor),cruising(actor,piece)).walkSteps} 格`}（${value} 点）`);
   });
-  if(kind==='retreat')for(const p of state.players)p.pieces.forEach((v,piece)=>{if(v>0&&v<FINISH)add({target:p.id,piece},`${p.name} ${piece+1} 号飞机 · 倒退 ${4*moveMultiplier(actor)} 格`);});
+  if(kind==='retreat')for(const p of state.players)p.pieces.forEach((v,piece)=>{if(v>0&&v<FINISH)add({target:p.id,piece},`${p.name} ${piece+1} 号飞机 · 倒退 ${4*moveMultiplier(actor)*(cruising(p,piece)?2:1)} 格`);});
   if(kind==='triple'&&tripleLayers(actor)<2)add({},`下一次实际移动 ×${3**(tripleLayers(actor)+1)}（可配合定点骰子）`);
   if(kind==='barrier')for(let cell=0;cell<52;cell++){
     if(!state.barriers.includes(cell)&&!state.players.some(p=>p.pieces.some(v=>onRing(v)&&globalIndex(p,v)===cell)))add({cell},`公共航道 ${cell+1} 号格`);
@@ -110,7 +127,7 @@ export function cardOptions(state,index) {
   });
   if(kind==='double'&&actor.pieces.includes(-1))add({},`起飞 ${actor.pieces.filter(v=>v<0).length} 架飞机`);
   for(const enemy of state.players){
-    if(enemy.id===actor.id)continue;
+    if(allies(state,enemy.id,actor.id))continue;
     if((kind==='disrupt'||kind==='steal')&&enemy.hand.length)add({target:enemy.id},`${enemy.name}（${enemy.hand.length} 张卡）`);
   }
   if(kind==='missile')actor.pieces.forEach((v,piece)=>{
@@ -119,7 +136,7 @@ export function cardOptions(state,index) {
     if(!targets.length)return;
     const names=targets.map(t=>{
       const p=state.players.find(p=>p.id===t.player);
-      return `${p.id===actor.id?'友机':p.name} ${t.piece+1} 号${p.shields[t.piece]?'（护盾抵挡）':''}`;
+      return `${allies(state,p.id,actor.id)?'友机 '+p.name:p.name} ${t.piece+1} 号${p.shields[t.piece]?'（护盾抵挡）':''}`;
     });
     add({piece},`${piece+1} 号发射 → ${names.join('、')}`);
   });
@@ -127,6 +144,7 @@ export function cardOptions(state,index) {
 }
 function hit(state,enemy,piece,rng) {
   if(enemy.shields[piece]){enemy.shields[piece]=false;return false;}
+  if(enemy.cruise)enemy.cruise[piece]=false;
   enemy.pieces[piece]=-1;enemy.stats.destroyed++;drawCards(state,enemy,1,rng,'撞毁补偿');return true;
 }
 export function useCard(state,index,args={},rng=randomIndex) {
@@ -135,7 +153,7 @@ export function useCard(state,index,args={},rng=randomIndex) {
   if(!option)return null;
   const actor=state.players[state.current],kind=actor.hand[index],a=option.args;
   actor.hand.splice(index,1);state.skillUsed=true;actor.stats.cardsUsed++;
-  const result={kind,actor:actor.id,args:{...a},effects:[],text:`${actor.name}使用了「${CARDS[kind].name}」`};
+  const result={kind,actor:actor.id,args:{...a},effects:[{kind:'card-play',player:actor.id,card:kind}],text:`${actor.name}使用了「${CARDS[kind].name}」`};
   const enemy=state.players.find(p=>p.id===a.target);
   if(a.piece!==undefined)result.from=position(actor,actor.pieces[a.piece],a.piece);
   if(kind==='dice'||kind==='retreat'){
@@ -152,6 +170,10 @@ export function useCard(state,index,args={},rng=randomIndex) {
     result.text+=`，${movingPlayer.name} ${a.piece+1} 号飞机${kind==='retreat'?`倒退 ${movement.steps} 格`:movement.from<0?'立即起飞':`额外前进 ${movement.steps} 格`}${movement.destroyed?'，碰到城墙被击回机场':movement.barrierBlocked?'，护盾抵消城墙，停在该格':''}，${state.phase==='won'?'全部归航！':'仍可正常出牌、掷骰'}`;
   }
   if(kind==='triple'){actor.triple=tripleLayers(actor)+1;result.text+=`，下一次实际移动步数 ×${moveMultiplier(actor)}（${actor.triple}/2 层）`;}
+  if(kind==='cruise'){
+    actor.cruise??=[false,false,false,false];actor.cruise[a.piece]=true;
+    result.effects.push({kind:'cruise',at:result.from});result.text+=`，${a.piece+1} 号飞机持续双倍步数，进入最终航道结束`;
+  }
   if(kind==='barrier'){result.effects.push({kind:'barrier',at:RING[a.cell]});state.barriers.push(a.cell);result.text+=`，设在 ${a.cell+1} 号格`;}
   if(kind==='shield'){result.effects.push({kind:'shield',at:result.from});actor.shields[a.piece]=true;result.text+=`，保护 ${a.piece+1} 号飞机`;}
   if(kind==='missile'){
@@ -160,7 +182,7 @@ export function useCard(state,index,args={},rng=randomIndex) {
     for(const target of targets){
       const victim=state.players.find(p=>p.id===target.player),at=position(victim,victim.pieces[target.piece],target.piece);
       const captured=hit(state,victim,target.piece,rng);
-      if(captured){if(victim.id===actor.id)friends++;else {enemies++;actor.stats.captures++;}}else blocked++;
+      if(captured){if(allies(state,victim.id,actor.id))friends++;else {enemies++;actor.stats.captures++;}}else blocked++;
       result.effects.push({kind:'missile',from:result.from,at,blocked:!captured});
     }
     result.text+=`，击毁敌机 ${enemies} 架、友机 ${friends} 架${blocked?`，${blocked} 架被护盾保护`:''}`;
@@ -213,22 +235,28 @@ export function roll(state, value) {
   state.phase = 'choose';
   return true;
 }
-export function previewMove(progress, die) {
+export function previewMove(progress, die,cruise=false) {
   if (progress < 0) return { target: 0, route: [0], jump: false, flight: false };
   const route = [];
-  let p = progress, direction = 1;
+  let p = progress, direction = 1,enteredHome=false;
+  let accelerating=cruise&&progress<=50;
   for (let i = 0; i < die; i++) {
-    if (p === FINISH) direction = -1;
-    p += direction;
-    route.push(p);
+    const stride=accelerating?2:1;
+    for(let j=0;j<stride;j++){
+      if (p === FINISH) direction = -1;
+      p += direction;
+      route.push(p);
+      if(accelerating&&p>=51){accelerating=false;enteredHome=true;break;}
+    }
   }
+  const walkSteps=route.length;
   let jump = false, flight = false;
   if (p === 18) { p = 30; route.push(p); flight = true; p = 34; route.push(p); jump = true; }
   else if (p > 0 && p <= 46 && p % 4 === 2) {
     p += 4; route.push(p); jump = true;
     if (p === 18) { p = 30; route.push(p); flight = true; }
   }
-  return { target: p, route, jump, flight };
+  return { target: p, route, jump, flight,walkSteps,enteredHome };
 }
 function previewRetreat(progress,steps) {
   const route=Array.from({length:Math.min(progress,steps)},(_,i)=>progress-i-1);
@@ -243,20 +271,22 @@ function previewRetreat(progress,steps) {
 function crossesFlight(route){
   return route.some((p,i)=>(p===18&&route[i+1]===30)||(p===30&&route[i+1]===18));
 }
-export function planMove(state,player,progress,die,direction=1) {
-  const result=direction===-1?previewRetreat(progress,die):previewMove(progress,die);
+export function planMove(state,player,progress,die,direction=1,cruise=false) {
+  const result=direction===-1?previewRetreat(progress,die*(cruise?2:1)):previewMove(progress,die,cruise);
+  const walkSteps=result.walkSteps??die*(cruise&&direction===-1?2:1);
+  result.walkSteps=walkSteps;
   const stop=result.route.findIndex(p=>onRing(p)&&state.barriers.includes(globalIndex(player,p)));
   if(stop>=0){
     result.route=result.route.slice(0,stop+1);result.target=result.route.at(-1);
     result.barrier=globalIndex(player,result.target);result.jump=false;result.flight=false;
   }
   // A shielded landing blocks the whole landing, before any capture at that cell.
-  for(let i=Math.min(die,result.route.length)-1;i<result.route.length;i++){
+  for(let i=Math.min(walkSteps,result.route.length)-1;i<result.route.length;i++){
     const p=result.route[i];
     if(!onRing(p)||(result.barrier!==undefined&&globalIndex(player,p)===result.barrier))continue;
     let defender=null;
     for(const enemy of state.players){
-      if(enemy.id===player.id)continue;
+      if(allies(state,enemy.id,player.id))continue;
       const piece=enemy.pieces.findIndex((v,n)=>onRing(v)&&globalIndex(enemy,v)===globalIndex(player,p)&&enemy.shields[n]);
       if(piece>=0){defender={player:enemy.id,piece};break;}
     }
@@ -268,6 +298,7 @@ export function planMove(state,player,progress,die,direction=1) {
     result.flight=crossesFlight(result.route);
     result.jump=false;break;
   }
+  result.enteredHome=cruise&&result.route.some(p=>p>=51);
   return result;
 }
 function crossesHomePlane(player,route,enemy,progress){
@@ -281,9 +312,11 @@ export function move(state, piece, rng=randomIndex,extra=null) {
   const boosted=multiplier>1;
   const steps=state.die*multiplier;
   if(boosted&&!extra)player.triple=false;
-  const result = planMove(state,player,player.pieces[piece],steps,extra?.direction||1);
+  const cruise=cruising(player,piece);
+  const result = planMove(state,player,player.pieces[piece],steps,extra?.direction||1,cruise);
+  if(result.enteredHome&&player.cruise)player.cruise[piece]=false;
   if(result.barrier!==undefined)state.barriers.splice(state.barriers.indexOf(result.barrier),1);
-  result.steps=steps;result.boosted=boosted;
+  result.steps=cruise?(extra?.direction===-1?steps*2:result.walkSteps):steps;result.boosted=boosted;result.cruising=cruise;
   result.from = player.pieces[piece];
   result.captured = [];
   result.blocked = [];
@@ -305,11 +338,11 @@ export function move(state, piece, rng=randomIndex,extra=null) {
     player.stats.captures++;result.captured.push({player:enemy.id,piece:i});
   }
   // Ordinary transit is safe; flight crossings additionally hit the intersected home cell.
-  const landing = result.route.slice(Math.min(steps, result.route.length) - 1);
+  const landing = result.route.slice(Math.min(result.walkSteps, result.route.length) - 1);
   for (const p of new Set(landing)) {
     if (p === 0 || p > 50 || (result.shieldStop&&p===result.target) || (result.barrier!==undefined&&globalIndex(player,p)===result.barrier)) continue;
     for (const enemy of state.players) {
-      if (enemy.id === player.id) continue;
+      if (allies(state,enemy.id,player.id)) continue;
       enemy.pieces.forEach((enemyP, i) => {
         if (enemyP > 0 && enemyP <= 50 && globalIndex(enemy, enemyP) === globalIndex(player, p)) {
           strike(enemy,i);
@@ -318,7 +351,7 @@ export function move(state, piece, rng=randomIndex,extra=null) {
     }
   }
   for(const enemy of state.players){
-    if(enemy.id===player.id)continue;
+    if(allies(state,enemy.id,player.id))continue;
     enemy.pieces.forEach((p,i)=>{if(crossesHomePlane(player,result.route,enemy,p))strike(enemy,i);});
   }
   player.pieces[piece] = result.target;
@@ -328,6 +361,7 @@ export function move(state, piece, rng=randomIndex,extra=null) {
       player.shields[piece]=false;result.barrierBlocked=true;
       result.effects.push({kind:'blocked',at:RING[result.barrier]});
     }else{
+      if(player.cruise)player.cruise[piece]=false;
       player.pieces[piece]=-1;player.stats.destroyed++;
       result.destroyed=true;result.target=-1;
       drawCards(state,player,1,rng,'城墙撞毁补偿');
@@ -344,7 +378,7 @@ export function endTurn(state,rng=randomIndex) {
   if (state.phase === 'roll' || (state.phase === 'choose' && legalPieces(state).length)) return;
   if (state.die !== 6) {
     state.current = (state.current + 1) % state.players.length; state.turn++;
-    if(state.current===0){state.round++;if((state.round-1)%5===0)state.players.forEach(p=>drawCards(state,p,1,rng,'五轮补卡'));}
+    if(state.current===0){state.round++;if((state.round-1)%4===0)state.players.forEach(p=>drawCards(state,p,1,rng,'四轮补卡'));}
   }
   state.die = null;
   state.skillUsed=false;state.forcedDie=null;
@@ -353,24 +387,24 @@ export function endTurn(state,rng=randomIndex) {
 const planeValue=p=>p<0?0:p===FINISH?195:p>=51?125+(p-51)*8:12+p*1.8;
 function positionValue(state,id){
   const own=state.players.find(p=>p.id===id);
-  if(own.pieces.every(p=>p===FINISH))return 100000;
-  if(state.players.some(p=>p.id!==id&&p.pieces.every(v=>v===FINISH)))return -100000;
+  if(state.players.some(p=>allies(state,p.id,id)&&p.pieces.every(v=>v===FINISH)))return 100000;
+  if(state.players.some(p=>!allies(state,p.id,id)&&p.pieces.every(v=>v===FINISH)))return -100000;
   let value=0;
   for(const p of state.players){
-    const weight=p.id===id?1:-.48;
+    const weight=allies(state,p.id,id)?1:-.48;
     value+=weight*(p.pieces.reduce((sum,v)=>sum+planeValue(v),0)+p.hand.length*7+p.shields.filter(Boolean).length*10);
   }
   // Expected damage from each opponent's best collision on its next die roll.
   // Real routes account for flight/jump landings, barriers, shared squares and shields.
   for(const enemy of state.players){
-    if(enemy.id===id)continue;
+    if(allies(state,enemy.id,id))continue;
     let expected=0;
     for(let die=1;die<=6;die++){
       let worst=0;
-      for(const p of enemy.pieces){
+      for(const [piece,p] of enemy.pieces.entries()){
         if(p<0||p===FINISH)continue;
-        const steps=die*moveMultiplier(enemy),route=planMove(state,enemy,p,steps);
-        const landings=new Set(route.route.slice(Math.min(steps,route.route.length)-1).filter(v=>onRing(v)&&(route.barrier===undefined||globalIndex(enemy,v)!==route.barrier)).map(v=>globalIndex(enemy,v)));
+        const steps=die*moveMultiplier(enemy),route=planMove(state,enemy,p,steps,1,cruising(enemy,piece));
+        const landings=new Set(route.route.slice(Math.min(route.walkSteps,route.route.length)-1).filter(v=>onRing(v)&&(route.barrier===undefined||globalIndex(enemy,v)!==route.barrier)).map(v=>globalIndex(enemy,v)));
         const loss=own.pieces.reduce((sum,v,i)=>sum+((onRing(v)&&landings.has(globalIndex(own,v))||crossesHomePlane(enemy,route.route,own,v))?(own.shields[i]?10:planeValue(v)-(state.rules==='skills'&&own.hand.length<5?7:0)):0),0);
         worst=Math.max(worst,loss);
       }

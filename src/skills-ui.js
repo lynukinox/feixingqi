@@ -31,7 +31,7 @@ export function mountSkills({getState,getOnline,isBusy,play,discard}) {
     const launchers=state.players[state.current].pieces.flatMap((p,i)=>p>0&&p<=50?[i]:[]);
     if(!options.length)return;
     selection={index,options};
-    boardButton.hidden=!['missile','shield','recycle','barrier'].includes(kind);
+    boardButton.hidden=!['missile','shield','recycle','barrier','cruise'].includes(kind);
     boardButton.onclick=()=>{
       picker.begin({kind,state,options,onBack:()=>dialog.showModal(),onPick:args=>{
         target.value=String(selection.options.findIndex(o=>Object.keys(o.args).every(k=>o.args[k]===args[k])));mark();dialog.showModal();
@@ -69,7 +69,7 @@ export function mountSkills({getState,getOnline,isBusy,play,discard}) {
     panel.innerHTML=`<div class="players-title"><h3>${room?'我的':escapeHTML(owner.name)+'的'}技能卡</h3><span>${owner.hand.length} / 5</span></div><p class="skill-hint">${hint}${owner.triple?' · 强行顶 '+tripleLayers(owner)+'/2 层，下一次移动 ×'+moveMultiplier(owner):''}</p><div class="skill-hand">${owner.hand.map((kind,index)=>{
       const card=hidden?null:CARDS[kind],enabled=canPlay&&cardOptions(state,index).length>0;
       return `<button type="button" class="skill-card" data-kind="${card?kind:'hidden'}" data-card="${index}" ${enabled?'':'disabled'} title="${card?escapeHTML(card.description):'对手的手牌'}">${cardFace(card?kind:'hidden',card?.name||'隐藏手牌',enabled?'点击使用 ↗':canPlay?'暂无有效目标':'等待使用')}</button>`;
-    }).join('')||'<p class="skill-empty">暂无手牌，归航或被撞毁可补卡。</p>'}</div><p class="skill-round">第 ${state.round} 轮 · 再完成 ${5-(state.round-1)%5} 轮补卡</p>`;
+    }).join('')||'<p class="skill-empty">暂无手牌，归航或被撞毁可补卡。</p>'}</div><p class="skill-round">第 ${state.round} 轮 · 再完成 ${4-(state.round-1)%4} 轮补卡</p>`;
     if(canPlay&&owner.hand.length){
       const button=document.createElement('button');button.className='secondary-button';button.textContent='主动弃牌';
       button.onclick=()=>{

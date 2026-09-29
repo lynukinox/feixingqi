@@ -31,7 +31,7 @@ export function createGameServer({rollDie=()=>randomInt(1,7),turnMs=60000,cardRa
   function snapshot(r,memberId){
     const state=r.state?structuredClone(r.state):null;
     if(state)state.players.forEach((p,i)=>{if(r.members[i].id!==memberId){p.hand=p.hand.map(()=>null);p.pendingCards=(p.pendingCards||[]).map(()=>null);}});
-    return {code:r.code,rules:r.rules,revision:r.revision,host:hostOf(r),status:r.state?'playing':'waiting',members:r.members.map(({id,name,socketId,bot},i)=>({id,name,bot:!!bot,connected:!!socketId,color:r.state?.players[i]?.id??i})),state,logs:r.logs,deadline:r.deadline,lastDie:r.lastDie,event:r.event};
+    return {code:r.code,rules:r.rules,teamMode:!!r.teamMode,revision:r.revision,host:hostOf(r),status:r.state?'playing':'waiting',members:r.members.map(({id,name,socketId,bot},i)=>({id,name,bot:!!bot,connected:!!socketId,color:r.state?.players[i]?.id??i})),state,logs:r.logs,deadline:r.deadline,lastDie:r.lastDie,event:r.event};
   }
   function publish(r,event=null){
     r.revision++;r.event=event;r.updated=Date.now();persist();
@@ -89,10 +89,11 @@ export function createGameServer({rollDie=()=>randomInt(1,7),turnMs=60000,cardRa
       return {id:randomBytes(8).toString('hex'),token:randomBytes(24).toString('hex'),name:name.trim(),socketId:null};
     }
     handler('create',({name,rules='classic'})=>{
-      if(!['classic','skills'].includes(rules))throw Error('玩法无效');
+      if(!['classic','skills','skills2v2'].includes(rules))throw Error('玩法无效');
+      const teamMode=rules==='skills2v2';if(teamMode)rules='skills';
       if(getRoom())throw Error('请先离开当前房间');if(rooms.size>=200)throw Error('房间已满，请稍后重试');
       const m=newMember(name);let code;do{code=randomBytes(4).toString('hex').slice(0,6).toUpperCase();}while(rooms.has(code));
-      const r={code,rules,members:[m],state:null,revision:0,logs:[],updated:Date.now(),timer:null,deadline:null};rooms.set(code,r);return join(r,m);
+      const r={code,rules,teamMode,members:[m],state:null,revision:0,logs:[],updated:Date.now(),timer:null,deadline:null};rooms.set(code,r);return join(r,m);
     });
     handler('join',({code,name,token})=>{
       const r=rooms.get(typeof code==='string'?code.toUpperCase():'');if(!r)throw Error('房间不存在或已过期，请重新创建');
@@ -112,8 +113,9 @@ export function createGameServer({rollDie=()=>randomInt(1,7),turnMs=60000,cardRa
       const r=getRoom();if(!r||hostOf(r)!==socket.data.member)throw Error('只有房主可以开始');
       if(revision!==r.revision)throw Error('房间状态已更新，请重试');
       if(r.state&&r.state.phase!=='won')throw Error('对局已经开始');
+      if(r.teamMode&&r.members.length!==4)throw Error('2v2 需要四位玩家全部加入');
       if(r.members.length<2||r.members.some(m=>!m.bot&&!m.socketId))throw Error('至少需要 2 人，且所有成员均在线');
-      r.state=createState({mode:'local',count:r.members.length,rules:r.rules,rng:cardRandom});r.state.players.forEach((p,i)=>{p.name=r.members[i].name;p.ai=!!r.members[i].bot;});r.logs=[];r.lastDie=null;
+      r.state=createState({mode:'local',count:r.members.length,rules:r.rules,teamMode:r.teamMode,rng:cardRandom});r.state.players.forEach((p,i)=>{p.name=r.members[i].name;p.ai=!!r.members[i].bot;});r.logs=[];r.lastDie=null;
       log(r,'所有飞行员已就位，联网对局开始！');arm(r);publish(r,{kind:'start'});return {};
     });
     function authorize(revision,phase){

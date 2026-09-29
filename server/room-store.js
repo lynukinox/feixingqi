@@ -8,7 +8,7 @@ export function loadRooms(path,ttl){
   if(data.version!==1||!Array.isArray(data.rooms))throw Error('房间存档格式无效，请保留文件并检查版本');
   return data.rooms.filter(r=>Date.now()-r.updated<ttl).map(r=>{
     if(!/^[0-9A-F]{6}$/.test(r.code)||!Array.isArray(r.members)||!r.members.length)throw Error('房间存档损坏');
-    if(r.state)r.state.players.forEach(p=>{p.stats??={captures:0,destroyed:0,cardsUsed:0};p.pendingCards??=[];});
+    if(r.state)r.state.players.forEach(p=>{p.stats??={captures:0,destroyed:0,cardsUsed:0};p.pendingCards??=[];p.cruise??=[false,false,false,false];});
     return {...r,event:null,timer:null,deadline:null,members:r.members.map(m=>({...m,socketId:null}))};
   });
 }

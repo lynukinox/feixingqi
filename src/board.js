@@ -57,7 +57,7 @@ export class Board extends Phaser.Scene {
     this.pending=state;this.controllableId=controllableId;if(!this.ready)return;
     const legal=legalPieces(state),current=state.players[state.current];
     const activePlayer=!current.ai&&(controllableId===null||current.id===controllableId)&&legal.length?current.id:null;
-    const visualKey=JSON.stringify([state.rules,state.barriers,state.players.map(p=>[p.id,p.pieces,p.shields]),activePlayer,activePlayer===null?[]:legal]);
+    const visualKey=JSON.stringify([state.rules,state.barriers,state.players.map(p=>[p.id,p.pieces,p.shields,p.cruise]),activePlayer,activePlayer===null?[]:legal]);
     if(this.visualKey===visualKey)return;
     this.visualKey=visualKey;
     this.tokens.forEach(t=>{this.tweens.killTweensOf(t);t.destroy();});this.tokens=[];
@@ -100,6 +100,7 @@ export class Board extends Phaser.Scene {
       if(active)disk.lineStyle(3,color(player.id),.8).strokeCircle(0,0,28);
       if(player.shields?.[i]&&!arrived)disk.lineStyle(4,0x68daf2).strokeCircle(0,0,32);
       c.add(disk);
+      if(player.cruise?.[i]&&!arrived)c.add(this.add.text(-18,-23,'×2',{fontFamily:'Arial',fontSize:'13px',fontStyle:'bold',color:'#fff',backgroundColor:'#427f87',padding:{x:4,y:2}}).setOrigin(.5));
       if(arrived)c.add(this.add.text(0,0,'✓',{fontSize:'27px',fontStyle:'bold',color:COLORS[player.id]}).setOrigin(.5));
       else {
         const icon=this.add.image(0,-1,`plane-${player.id}`).setDisplaySize(46,46).setRotation((player.id+1)*Math.PI/2);
@@ -131,7 +132,7 @@ export class Board extends Phaser.Scene {
         const [sx,sy]=e.from,projectile=this.label(sx,sy,e.kind==='missile'?'➤':'✈',38,e.kind==='missile'?'#dd673d':'#6384a5').setDepth(65);
         projectile.setRotation(Math.atan2(y-sy,x-sx));
         this.tweens.add({targets:projectile,x,y,duration:500,ease:'Sine.easeIn',onComplete:()=>{projectile.destroy();burst(e.kind==='recycle'?'他就堵了 +2':e.blocked?'护盾抵挡':'命中！',e.blocked?'#368fa9':'#d96a38');}});
-      }else burst(({blocked:'护盾破裂',shield:'护盾已展开',barrier:'城墙',crash:'撞毁！',double:'一起起飞'})[e.kind]||'技能生效',e.kind==='blocked'||e.kind==='shield'?'#368fa9':'#d58a38');
+      }else burst(({blocked:'护盾破裂',shield:'护盾已展开',cruise:'双倍巡航 ×2',barrier:'城墙',crash:'撞毁！',double:'一起起飞'})[e.kind]||'技能生效',e.kind==='blocked'||e.kind==='shield'||e.kind==='cruise'?'#368fa9':'#d58a38');
     }
   }
   async animate(player,piece,route) {
